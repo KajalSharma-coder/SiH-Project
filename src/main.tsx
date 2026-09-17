@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
+import { AuthProvider, ProtectedRoute } from "./context/AuthContext";
 import "./index.css";
 import { BuyerDashboard, BuyerDemand, BuyerMatches } from "./pages/Buyer";
 import { CreateLot, FarmerDashboard, FarmerMatches, QualityPassport } from "./pages/Farmer";
@@ -19,12 +20,40 @@ const router = createBrowserRouter([
       { index: true, element: <Home /> },
       { path: "login", element: <Login /> },
       { path: "market", element: <Market /> },
-      { path: "farmer/dashboard", element: <FarmerDashboard /> },
-      { path: "farmer/create-lot", element: <CreateLot /> },
+      {
+        path: "farmer/dashboard",
+        element: (
+          <ProtectedRoute roleRequired="Farmer">
+            <FarmerDashboard />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "farmer/create-lot",
+        element: (
+          <ProtectedRoute roleRequired="Farmer">
+            <CreateLot />
+          </ProtectedRoute>
+        ),
+      },
       { path: "farmer/quality", element: <QualityPassport /> },
       { path: "farmer/matches", element: <FarmerMatches /> },
-      { path: "buyer/dashboard", element: <BuyerDashboard /> },
-      { path: "buyer/demand", element: <BuyerDemand /> },
+      {
+        path: "buyer/dashboard",
+        element: (
+          <ProtectedRoute roleRequired="Buyer">
+            <BuyerDashboard />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "buyer/demand",
+        element: (
+          <ProtectedRoute roleRequired="Buyer">
+            <BuyerDemand />
+          </ProtectedRoute>
+        ),
+      },
       { path: "buyer/matches", element: <BuyerMatches /> },
       { path: "deal-room/:id", element: <DealRoom /> },
       { path: "bill/:id", element: <Bill /> },
@@ -39,6 +68,8 @@ const router = createBrowserRouter([
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <RouterProvider router={router} />
-  </React.StrictMode>,
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>
+  </React.StrictMode>
 );
