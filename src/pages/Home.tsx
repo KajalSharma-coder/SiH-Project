@@ -1,79 +1,117 @@
-import { ArrowDownRight, ArrowUpRight, Clock, Gauge, Radio, TrendingUp } from "lucide-react";
-import { useMemo, useState } from "react";
-import { ForecastChart } from "../components/ForecastChart";
-import { MarketSelector } from "../components/MarketSelector";
+import { ArrowRight, BadgeCheck, BarChart3, Handshake, Landmark, Leaf, ShieldCheck, Store, Users } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Section, StatCard } from "../components/Cards";
-import { marketQuotes } from "../data/mockData";
+import { deals, marketQuotes } from "../data/mockData";
+import { getLots } from "../services/storage";
 import { money } from "../utils/format";
 
+const stakeholders = [
+  {
+    title: "Farmers",
+    icon: Leaf,
+    detail: "Create produce lots, verify samples, compare prices, receive matched offers, and keep a reliability trail.",
+  },
+  {
+    title: "Buyers",
+    icon: Store,
+    detail: "Post crop requirements, shortlist reliable lots, negotiate offers, and finalize direct or FairTrade-recorded deals.",
+  },
+  {
+    title: "Mandi stakeholders",
+    icon: Landmark,
+    detail: "See validated local price signals, quality status, and transaction feedback that keeps the market transparent.",
+  },
+];
+
+const flow = [
+  ["1", "Live price intelligence", "Region, mandi, crop and grade-wise price prediction helps both sides anchor negotiations."],
+  ["2", "Quality-backed lots", "Samples receive an ID, lab result and FairTrade grade before being shown as verified."],
+  ["3", "Matched negotiation", "Buyer requirements are matched with farmer lots using price, quality, quantity and reliability."],
+  ["4", "Digital deal record", "Every agreed deal can generate a bill, with FairTrade payment confirmations when selected."],
+] as const;
+
 export function Home() {
-  const [quote, setQuote] = useState(marketQuotes.find((item) => item.city === "Kota" && item.mandi === "Ramganj Mandi" && item.crop === "Wheat" && item.grade === "FAQ") ?? marketQuotes[0]);
-  const comparisons = useMemo(
-    () => marketQuotes.filter((item) => item.crop === quote.crop && item.grade === quote.grade).slice(0, 8),
-    [quote.crop, quote.grade],
-  );
-  const predicted = quote.forecast.filter((item) => item.predicted);
-  const min = Math.min(...predicted.map((item) => item.low));
-  const max = Math.max(...predicted.map((item) => item.high));
-  const ChangeIcon = quote.change >= 0 ? ArrowUpRight : ArrowDownRight;
+  const quote = marketQuotes[0];
+  const completed = deals.filter((deal) => deal.status === "Completed").length;
+  const activeLots = getLots().filter((lot) => lot.status !== "Sold").length;
 
   return (
     <div>
       <section className="overflow-hidden rounded-md border border-field/10 bg-white shadow-soft">
         <div className="grid gap-8 p-5 lg:grid-cols-[1.05fr_0.95fr] lg:p-8">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-md bg-leaf/10 px-3 py-2 text-sm font-semibold text-field">
-              <Radio size={16} /> Live market signal
-            </div>
+            <span className="inline-flex items-center gap-2 rounded-md bg-leaf/10 px-3 py-2 text-sm font-bold text-field">
+              <BadgeCheck size={16} /> SIH-ready agri marketplace
+            </span>
             <h1 className="mt-5 max-w-3xl text-4xl font-black tracking-tight text-ink sm:text-5xl">
-              Live Mandi Price & 7-Day Forecast
+              FairTrade connects mandi prices, verified quality and buyer-seller deals.
             </h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-ink/68">
-              Compare validated mandi trends, indicative price ranges, and buyer-ready quality grades in one clean FairTrade workspace.
+              A clean workflow where farmers list produce, buyers post demand, quality samples build trust, and every agreed deal creates a digital bill.
             </p>
-            <div className="mt-6">
-              <MarketSelector quote={quote} onChange={setQuote} />
-            </div>
-            <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <StatCard label="Current price" value={`${money(quote.currentPrice)}/Qt`} helper={`${quote.crop} · ${quote.grade}`} icon={TrendingUp} />
-              <StatCard label="Today's change" value={`${quote.change >= 0 ? "+" : ""}${quote.change}`} helper="Compared with last close" icon={ChangeIcon} />
-              <StatCard label="High / Low" value={`${money(quote.high)} / ${money(quote.low)}`} helper="Intraday mandi band" icon={Gauge} />
-              <StatCard label="Last updated" value={quote.updatedAt.split(", ")[1]} helper={quote.updatedAt} icon={Clock} />
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link to="/market" className="inline-flex items-center gap-2 rounded-md bg-field px-5 py-3 text-sm font-bold text-white">
+                View Price Prediction <ArrowRight size={16} />
+              </Link>
+              <Link to="/login" className="inline-flex items-center gap-2 rounded-md border border-field/20 bg-white px-5 py-3 text-sm font-bold text-field">
+                Login / Signup
+              </Link>
             </div>
           </div>
+
           <div className="rounded-md bg-cream p-4">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-sm font-semibold text-field">7-Day Indicative Forecast — actual prices may vary.</p>
-                <p className="text-xs text-ink/55">Expected range {money(min)} to {money(max)} · Confidence {quote.confidence}%</p>
-              </div>
-              <span className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-xs font-bold text-field">
-                <span className="h-2 w-2 rounded-full bg-leaf" /> Updated
-              </span>
+            <p className="text-sm font-bold text-field">Today on FairTrade</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <StatCard label="Kota wheat FAQ" value={`${money(quote.currentPrice)}/Qt`} helper="Live mandi reference" icon={BarChart3} />
+              <StatCard label="Active lots" value={String(activeLots)} helper="Across demo markets" icon={Leaf} />
+              <StatCard label="Completed bills" value={String(completed)} helper="Digital transaction records" icon={Handshake} />
+              <StatCard label="Quality verified" value="3" helper="Sample-backed lots" icon={ShieldCheck} />
             </div>
-            <ForecastChart data={quote.forecast} />
           </div>
         </div>
       </section>
 
-      <Section title="City-wise / Mandi-wise comparison" subtitle={`Comparing ${quote.crop} ${quote.grade} quotes across active FairTrade markets.`}>
-        <div className="overflow-x-auto rounded-md border border-field/10 bg-white shadow-soft">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-cream text-ink/65">
-              <tr><th className="p-3">City</th><th className="p-3">Mandi</th><th className="p-3">Price</th><th className="p-3">Change</th><th className="p-3">Confidence</th></tr>
-            </thead>
-            <tbody>
-              {comparisons.map((item) => (
-                <tr key={item.id} className="border-t border-field/10">
-                  <td className="p-3 font-semibold">{item.city}</td>
-                  <td className="p-3">{item.mandi}</td>
-                  <td className="p-3">{money(item.currentPrice)}/Qt</td>
-                  <td className={`p-3 font-semibold ${item.change >= 0 ? "text-field" : "text-red-600"}`}>{item.change >= 0 ? "+" : ""}{item.change}</td>
-                  <td className="p-3">{item.confidence}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <Section title="Mandi Stakeholders" subtitle="A simple marketplace loop for farmers, buyers and local market actors.">
+        <div className="grid gap-3 lg:grid-cols-3">
+          {stakeholders.map(({ title, icon: Icon, detail }) => (
+            <article key={title} className="rounded-md border border-field/10 bg-white p-5 shadow-soft">
+              <span className="grid h-11 w-11 place-items-center rounded-md bg-leaf/10 text-field"><Icon size={22} /></span>
+              <h2 className="mt-4 text-lg font-black">{title}</h2>
+              <p className="mt-2 text-sm leading-6 text-ink/65">{detail}</p>
+            </article>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="How FairTrade Works" subtitle="The platform stays focused on price clarity, trust and transaction recording.">
+        <div className="grid gap-3 lg:grid-cols-4">
+          {flow.map(([step, title, detail]) => (
+            <div key={step} className="rounded-md border border-field/10 bg-white p-5 shadow-soft">
+              <span className="grid h-9 w-9 place-items-center rounded-md bg-field text-sm font-black text-white">{step}</span>
+              <h3 className="mt-4 font-black">{title}</h3>
+              <p className="mt-2 text-sm leading-6 text-ink/62">{detail}</p>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Quick Workspaces">
+        <div className="grid gap-3 md:grid-cols-3">
+          <Link to="/farmer/dashboard" className="group rounded-md border border-field/10 bg-white p-5 shadow-soft transition hover:border-field">
+            <Users className="text-field" size={22} />
+            <p className="mt-3 font-black">Farmer Dashboard</p>
+            <p className="mt-1 text-sm text-ink/60">Lots, price intelligence, quality, offers and history.</p>
+          </Link>
+          <Link to="/buyer/dashboard" className="group rounded-md border border-field/10 bg-white p-5 shadow-soft transition hover:border-field">
+            <Store className="text-field" size={22} />
+            <p className="mt-3 font-black">Buyer Dashboard</p>
+            <p className="mt-1 text-sm text-ink/60">Requirements, matching lots, offers and active deals.</p>
+          </Link>
+          <Link to="/deal-room/DL-9001" className="group rounded-md border border-field/10 bg-white p-5 shadow-soft transition hover:border-field">
+            <Handshake className="text-field" size={22} />
+            <p className="mt-3 font-black">Deal Room</p>
+            <p className="mt-1 text-sm text-ink/60">Negotiate, choose direct/FairTrade mode and bill the deal.</p>
+          </Link>
         </div>
       </Section>
     </div>

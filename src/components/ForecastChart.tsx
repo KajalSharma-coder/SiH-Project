@@ -15,7 +15,7 @@ export function ForecastChart({ data, height = 280 }: { data: ForecastPoint[]; h
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="#d9e2d6" />
           <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#587166" }} />
-          <YAxis tickFormatter={(value) => `₹${value}`} tick={{ fontSize: 12, fill: "#587166" }} width={62} />
+          <YAxis tickFormatter={(value) => `Rs ${value}`} tick={{ fontSize: 12, fill: "#587166" }} width={62} />
           <Tooltip formatter={(value: number, name) => [money(value), name]} contentStyle={{ borderRadius: 8, border: "1px solid #d9e2d6" }} />
           <Area type="monotone" dataKey="high" stroke="transparent" fill="url(#forecastFill)" />
           <Area type="monotone" dataKey="low" stroke="transparent" fill="#fbfaf6" />

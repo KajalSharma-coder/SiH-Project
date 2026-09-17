@@ -1,9 +1,11 @@
 import { deals, demands, lots } from "../data/mockData";
-import type { Deal, Demand, Lot, MatchScore } from "../types";
+import type { ChatMessage, Deal, Demand, DemoSession, Lot, MatchScore } from "../types";
 
 const LOTS_KEY = "fairtrade-lots";
 const DEMANDS_KEY = "fairtrade-demands";
 const DEALS_KEY = "fairtrade-deals";
+const SESSION_KEY = "fairtrade-session";
+const CHAT_KEY = "fairtrade-chat";
 
 function read<T>(key: string, fallback: T): T {
   const raw = localStorage.getItem(key);
@@ -40,13 +42,35 @@ export function saveDemand(demand: Demand) {
 }
 
 export function getDeals() {
-  return read<Deal[]>(DEALS_KEY, deals);
+  return read<Deal[]>(DEALS_KEY, deals).map((deal) => ({
+    ...deal,
+    transactionMode: deal.transactionMode ?? "Use FairTrade",
+  }));
 }
 
 export function updateDeal(id: string, patch: Partial<Deal>) {
   const next = getDeals().map((deal) => (deal.id === id ? { ...deal, ...patch } : deal));
   write(DEALS_KEY, next);
   return next.find((deal) => deal.id === id);
+}
+
+export function getSession() {
+  return read<DemoSession | null>(SESSION_KEY, null);
+}
+
+export function saveSession(session: DemoSession) {
+  write(SESSION_KEY, session);
+  return session;
+}
+
+export function getChatMessages(dealId: string) {
+  return read<ChatMessage[]>(CHAT_KEY, []).filter((message) => message.dealId === dealId);
+}
+
+export function saveChatMessage(message: ChatMessage) {
+  const next = [...read<ChatMessage[]>(CHAT_KEY, []), message];
+  write(CHAT_KEY, next);
+  return next.filter((item) => item.dealId === message.dealId);
 }
 
 export function scoreMatches(demand: Demand, candidateLots = getLots()): MatchScore[] {

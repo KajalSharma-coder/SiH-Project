@@ -9,7 +9,7 @@ import { Home } from "./pages/Home";
 import { PricePulse, Reliability } from "./pages/Insights";
 import { Market } from "./pages/Market";
 import { Admin, Login, Settings } from "./pages/Misc";
-import { Bill, DealRoom } from "./pages/Transactions";
+import { Bill, DealRoom, Transactions } from "./pages/Transactions";
 
 const router = createBrowserRouter([
   {
@@ -28,6 +28,7 @@ const router = createBrowserRouter([
       { path: "buyer/matches", element: <BuyerMatches /> },
       { path: "deal-room/:id", element: <DealRoom /> },
       { path: "bill/:id", element: <Bill /> },
+      { path: "transactions", element: <Transactions /> },
       { path: "reliability", element: <Reliability /> },
       { path: "price-pulse", element: <PricePulse /> },
       { path: "admin", element: <Admin /> },

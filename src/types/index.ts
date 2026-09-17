@@ -78,6 +78,7 @@ export type Deal = {
   counterOffer: number;
   paymentGiven: boolean;
   paymentReceived: boolean;
+  transactionMode: "Direct Deal" | "Use FairTrade";
   status: "Offer Sent" | "Negotiating" | "Payment Pending" | "Completed";
   date: string;
 };
@@ -86,5 +87,22 @@ export type Activity = {
   id: string;
   title: string;
   detail: string;
+  time: string;
+};
+
+export type SessionRole = "Farmer" | "Buyer";
+
+export type DemoSession = {
+  role: SessionRole;
+  name: string;
+  phone: string;
+  signedInAt: string;
+};
+
+export type ChatMessage = {
+  id: string;
+  dealId: string;
+  sender: string;
+  text: string;
   time: string;
 };
