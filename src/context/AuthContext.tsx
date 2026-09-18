@@ -87,8 +87,8 @@ export function ProtectedRoute({ children, roleRequired }: { children: React.Rea
   if (loading) {
     return (
       <div className="grid min-h-[400px] place-items-center">
-        <div className="flex items-center gap-3 text-field font-semibold">
-          <span className="h-6 w-6 animate-spin rounded-full border-2 border-field border-t-transparent" />
+        <div className="flex items-center gap-3 text-[#B96832] font-semibold">
+          <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#B96832] border-t-transparent" />
           Checking authentication...
         </div>
       </div>

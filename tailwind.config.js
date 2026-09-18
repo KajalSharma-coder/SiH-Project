@@ -4,15 +4,15 @@ export default {
   theme: {
     extend: {
       colors: {
-        field: "#2f7d4d",
-        leaf: "#57a773",
-        cream: "#f6f1e7",
-        wheat: "#e9d8a6",
-        ink: "#17312a",
-        skyline: "#2e7da7"
+        field: "#B96832",
+        leaf: "#555633",
+        cream: "#F4EFE4",
+        wheat: "#E9E1D2",
+        ink: "#33291F",
+        bark: "#765536"
       },
       boxShadow: {
-        soft: "0 18px 50px rgba(23, 49, 42, 0.10)"
+        soft: "0 18px 45px rgba(51, 41, 31, 0.10)"
       }
     }
   },

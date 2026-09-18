@@ -9,18 +9,18 @@ export function ForecastChart({ data, height = 280 }: { data: ForecastPoint[]; h
         <AreaChart data={data} margin={{ left: 0, right: 8, top: 12, bottom: 0 }}>
           <defs>
             <linearGradient id="forecastFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#57a773" stopOpacity={0.28} />
-              <stop offset="95%" stopColor="#57a773" stopOpacity={0.04} />
+              <stop offset="5%" stopColor="#B96832" stopOpacity={0.22} />
+              <stop offset="95%" stopColor="#B96832" stopOpacity={0.04} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#d9e2d6" />
-          <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#587166" }} />
-          <YAxis tickFormatter={(value) => `Rs ${value}`} tick={{ fontSize: 12, fill: "#587166" }} width={62} />
-          <Tooltip formatter={(value: number, name) => [money(value), name]} contentStyle={{ borderRadius: 8, border: "1px solid #d9e2d6" }} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#D8CDBB" />
+          <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#765536" }} />
+          <YAxis tickFormatter={(value) => `Rs ${value}`} tick={{ fontSize: 12, fill: "#765536" }} width={62} />
+          <Tooltip formatter={(value: number, name) => [money(value), name]} contentStyle={{ borderRadius: 8, border: "1px solid #D8CDBB" }} />
           <Area type="monotone" dataKey="high" stroke="transparent" fill="url(#forecastFill)" />
-          <Area type="monotone" dataKey="low" stroke="transparent" fill="#fbfaf6" />
-          <Line type="monotone" dataKey="actual" stroke="#2e7da7" strokeWidth={3} dot={{ r: 4 }} connectNulls />
-          <Line type="monotone" dataKey="predicted" stroke="#2f7d4d" strokeWidth={3} dot={{ r: 4 }} connectNulls />
+          <Area type="monotone" dataKey="low" stroke="transparent" fill="#F4EFE4" />
+          <Line type="monotone" dataKey="actual" stroke="#555633" strokeWidth={3} dot={{ r: 4 }} connectNulls />
+          <Line type="monotone" dataKey="predicted" stroke="#B96832" strokeWidth={3} dot={{ r: 4 }} connectNulls />
         </AreaChart>
       </ResponsiveContainer>
     </div>

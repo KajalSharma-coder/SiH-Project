@@ -30,7 +30,7 @@ export function MarketSelector({ quote, quotes, onChange }: Props) {
     onChange(next);
   }
 
-  const selectClass = "w-full rounded-xl border border-[#2f7d4d]/20 bg-white px-3.5 py-3 text-sm text-[#17312a] shadow-sm outline-none transition focus:border-[#2f7d4d] focus:ring-2 focus:ring-[#2f7d4d]/15 font-semibold";
+  const selectClass = "w-full rounded-xl border border-[#D8CDBB] bg-white px-3.5 py-3 text-sm text-[#33291F] shadow-sm outline-none transition focus:border-[#B96832] focus:ring-2 focus:ring-[#B96832]/15 font-semibold";
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
       {[
@@ -40,7 +40,7 @@ export function MarketSelector({ quote, quotes, onChange }: Props) {
         ["Crop", "crop", crops],
         ["Grade", "grade", grades],
       ].map(([label, field, options]) => (
-        <label key={field as string} className="text-xs font-bold uppercase tracking-wider text-[#17312a]/65">
+        <label key={field as string} className="text-xs font-bold uppercase tracking-wider text-[#765536]">
           {label as string}
           <select className={selectClass} value={quote[field as keyof MarketQuote] as string} onChange={(event) => update(field as keyof MarketQuote, event.target.value)}>
             {(options as string[]).map((option) => <option key={option}>{option}</option>)}
