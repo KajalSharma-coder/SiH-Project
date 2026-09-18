@@ -20,15 +20,15 @@ export function PublicShell() {
     document.getElementById(location.hash.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [location]);
 
-  const navClass = "rounded-md px-3 py-2 text-sm font-bold text-[#765536] transition hover:bg-[#E9E1D2] hover:text-[#33291F]";
+  const navClass = "rounded-md px-2.5 py-2 text-xs font-bold text-[#F4EFE4] transition hover:bg-[#F4EFE4]/14 hover:text-white";
 
   return (
-    <div className="min-h-screen bg-[#F4EFE4] text-[#33291F]">
-      <header className="sticky top-0 z-40 border-b border-[#D8CDBB] bg-[#F4EFE4]/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-          <FairTradeLogo size="md" showSubtitle={false} />
+    <div className="h-screen overflow-hidden bg-[#F4EFE4] text-[#33291F]">
+      <header className="fixed inset-x-0 top-0 z-40 border-b border-[#F4EFE4]/12 bg-[#241B15]/95 shadow-[0_10px_28px_rgba(36,27,21,0.22)] backdrop-blur-md">
+        <div className="mx-auto flex max-w-[1120px] items-center justify-between px-5 py-2.5 sm:px-8">
+          <FairTradeLogo size="sm" showSubtitle={false} variant="dark" />
 
-          <nav className="hidden items-center gap-1 md:flex">
+          <nav className="hidden items-center gap-0.5 rounded-full border border-[#F4EFE4]/16 bg-[#33291F] px-2 py-1 shadow-sm lg:flex">
             {publicLinks.map(([label, href]) => (
               <Link key={href} to={href} className={navClass}>
                 {label}
@@ -37,16 +37,16 @@ export function PublicShell() {
           </nav>
 
           <div className="hidden items-center gap-2 md:flex">
-            <Link to="/login" className="rounded-md border border-[#555633] bg-[#F4EFE4] px-4 py-2 text-sm font-bold text-[#555633] transition hover:bg-[#E9E1D2]">
+            <Link to="/login" className="rounded-md border border-[#F4EFE4]/30 bg-[#5B5046] px-4 py-2 text-xs font-bold text-[#F4EFE4] shadow-sm transition hover:bg-[#6A5E52]">
               Login
             </Link>
-            <Link to="/signup" className="rounded-md bg-[#B96832] px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#9D5529]">
+            <Link to="/signup" className="rounded-md bg-[#B96832] px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#9D5529]">
               Sign Up
             </Link>
           </div>
 
           <button
-            className="grid h-10 w-10 place-items-center rounded-md border border-[#D8CDBB] bg-[#F4EFE4] text-[#33291F] md:hidden"
+            className="grid h-10 w-10 place-items-center rounded-md border border-[#F4EFE4]/30 bg-[#33291F]/70 text-[#F4EFE4] md:hidden"
             onClick={() => setOpen((value) => !value)}
             aria-label="Toggle menu"
           >
@@ -55,7 +55,7 @@ export function PublicShell() {
         </div>
 
         {open && (
-          <div className="border-t border-[#D8CDBB] bg-[#F4EFE4] px-4 py-3 md:hidden">
+          <div className="mx-5 rounded-md border border-[#F4EFE4]/20 bg-[#33291F]/95 px-4 py-3 shadow-soft backdrop-blur md:hidden">
             <nav className="grid gap-1">
               {publicLinks.map(([label, href]) => (
                 <Link key={href} to={href} className={navClass} onClick={() => setOpen(false)}>
@@ -64,7 +64,7 @@ export function PublicShell() {
               ))}
             </nav>
             <div className="mt-3 grid grid-cols-2 gap-2">
-              <Link to="/login" onClick={() => setOpen(false)} className="rounded-md border border-[#555633] bg-[#F4EFE4] px-4 py-2 text-center text-sm font-bold text-[#555633]">
+              <Link to="/login" onClick={() => setOpen(false)} className="rounded-md border border-[#F4EFE4]/35 bg-[#33291F] px-4 py-2 text-center text-sm font-bold text-[#F4EFE4]">
                 Login
               </Link>
               <Link to="/signup" onClick={() => setOpen(false)} className="rounded-md bg-[#B96832] px-4 py-2 text-center text-sm font-bold text-white">
@@ -75,7 +75,7 @@ export function PublicShell() {
         )}
       </header>
 
-      <main>
+      <main className="mt-[101px] h-[calc(100vh-101px)] overflow-y-auto">
         <Outlet />
       </main>
     </div>

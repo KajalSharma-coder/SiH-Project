@@ -1,4 +1,4 @@
-import { ArrowRight, BadgeIndianRupee, CheckCircle2, Handshake, Landmark, LineChart, Phone, Scale, ShieldCheck, Sprout, Store, Tractor, UsersRound } from "lucide-react";
+import { ArrowRight, BadgeIndianRupee, CheckCircle2, Handshake, Landmark, LineChart, Phone, ShieldCheck, Sprout, Store, Tractor, UsersRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import { FairTradeLogo } from "../components/Logo";
 
@@ -23,87 +23,35 @@ const stakeholders = [
 
 const benefits = ["Transparent Deals", "Price Intelligence", "Trusted Quality", "Direct Buyer-Seller Connection"] as const;
 
-function HeroIllustration() {
-  return (
-    <div className="relative min-h-[360px] lg:min-h-[420px]">
-      <div className="absolute bottom-4 right-1 h-16 w-16 rounded-sm border border-[#765536]/40 text-[#765536] shadow-[0_12px_24px_rgba(51,41,31,0.16)] sm:right-4">
-        <div className="grid h-full place-items-center">
-          <Scale size={34} strokeWidth={1.5} />
-        </div>
-      </div>
-
-      <div className="absolute bottom-10 left-2 h-24 w-24 rounded-[48%_52%_44%_56%] bg-[#E9E1D2] shadow-[inset_-12px_-10px_22px_rgba(118,85,54,0.16),0_16px_24px_rgba(51,41,31,0.16)] sm:left-8" />
-      <div className="absolute bottom-24 left-16 h-5 w-20 rounded-full bg-[#765536]/35 blur-sm" />
-      <div className="absolute bottom-20 left-24 flex gap-1.5">
-        {Array.from({ length: 7 }).map((_, index) => (
-          <span key={index} className="h-2.5 w-3 rounded-full bg-[#765536] shadow-sm" />
-        ))}
-      </div>
-
-      <div className="absolute bottom-4 right-14 w-[78%] max-w-[520px] sm:right-20">
-        <div className="relative rounded-md bg-[#E9E1D2] p-6 shadow-[0_28px_48px_rgba(51,41,31,0.26),inset_0_1px_0_rgba(255,255,255,0.8)] ring-1 ring-[#765536]/20">
-          <div className="absolute inset-0 rounded-md bg-[radial-gradient(circle_at_30%_18%,rgba(255,255,255,0.55),transparent_32%),linear-gradient(145deg,rgba(244,239,228,0.95),rgba(216,205,187,0.56))]" />
-          <div className="relative mx-auto max-w-[360px] rounded-t-full border-[7px] border-[#765536] border-b-0 px-8 pb-6 pt-8">
-            <div className="absolute left-1/2 top-0 grid h-20 w-20 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-[3px] border-[#B96832] bg-[#555633] text-[#F4EFE4] shadow-[0_10px_20px_rgba(51,41,31,0.22)]">
-              <Sprout size={38} strokeWidth={1.8} />
-            </div>
-            <div className="mt-10 grid grid-cols-3 gap-4">
-            {["Crop", "Price", "Deal"].map((label) => (
-              <div key={label} className="rounded-sm bg-[#F4EFE4] px-3 py-3 text-center shadow-[0_8px_10px_rgba(51,41,31,0.18),inset_0_1px_0_rgba(255,255,255,0.85)]">
-                <p className="text-[11px] font-black text-[#765536]">{label}</p>
-                <div className="mx-auto mt-2 h-1.5 w-10 rounded-full bg-[#B96832]" />
-              </div>
-            ))}
-            </div>
-          </div>
-          <div className="relative mx-auto mt-2 h-16 w-[86%] rounded-t-full bg-[linear-gradient(180deg,#9B724B,#5F432D)] shadow-[inset_0_6px_8px_rgba(255,255,255,0.18)]" />
-          <div className="relative mx-auto grid w-[92%] grid-cols-5 gap-2 px-2">
-            {["#F4EFE4", "#E9E1D2", "#B96832", "#A45C35", "#765536", "#765536", "#9B724B", "#F4EFE4", "#C8AF8B", "#E9E1D2"].map((color, index) => (
-              <span
-                key={index}
-                className="h-11 rounded-t-full shadow-[inset_-5px_-7px_10px_rgba(51,41,31,0.18),0_6px_10px_rgba(51,41,31,0.12)]"
-                style={{ backgroundColor: color }}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function Home() {
   return (
     <div>
-      <section className="relative isolate -mt-px min-h-[410px] overflow-hidden border-b border-[#D8CDBB] bg-[#E9E1D2]">
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_9%_27%,rgba(185,104,50,0.16)_0_0,transparent_76px),radial-gradient(circle_at_76%_12%,rgba(255,255,255,0.52),transparent_260px),linear-gradient(100deg,rgba(244,239,228,0.94)_0%,rgba(233,225,210,0.82)_48%,rgba(197,184,160,0.68)_100%)]" />
-        <div className="absolute inset-0 -z-10 opacity-40 [background-image:radial-gradient(rgba(118,85,54,0.18)_0.7px,transparent_0.7px)] [background-size:18px_18px]" />
-        <div className="absolute bottom-0 left-0 right-0 -z-10 h-24 bg-[linear-gradient(180deg,rgba(244,239,228,0),rgba(118,85,54,0.24)),linear-gradient(90deg,#C7B49A,#E2D4BE,#BFA382)]" />
-        <div className="absolute bottom-20 right-[39%] -z-10 h-16 w-28 rounded-full bg-[#33291F]/12 blur-2xl" />
-        <div className="mx-auto grid min-h-[410px] max-w-[1120px] gap-8 px-5 py-9 sm:px-8 lg:grid-cols-[0.9fr_1.1fr] lg:py-7">
-          <div className="flex flex-col justify-center pb-8 lg:pb-0">
-            <FairTradeLogo size="lg" clickable={false} />
-            <h1 className="mt-7 max-w-xl text-4xl font-black leading-[0.98] text-[#241B15] sm:text-5xl lg:text-[42px]">
-              Fair Prices. Trusted Markets.
-            </h1>
-            <p className="mt-4 max-w-md text-sm leading-7 text-[#765536]">
-              FairTrade connects farmers with buyers and helps them make informed, transparent and fair agricultural deals.
+      <section
+        className="relative isolate min-h-[570px] overflow-hidden border-b border-[#D8CDBB] bg-[#E9E1D2] bg-no-repeat sm:min-h-[610px] lg:min-h-[660px]"
+        style={{
+          backgroundImage: "url('/assets/fairtrade-hero-bg.jpg')",
+          backgroundPosition: "center bottom",
+          backgroundSize: "min(100%, 1600px) auto",
+        }}
+      >
+        <div className="absolute inset-0 -z-10 bg-[#FFF8EC]/5" />
+        <h1 className="sr-only">Fair Prices. Trusted Markets.</h1>
+        <p className="sr-only">
+          FairTrade connects farmers with buyers and helps them make informed, transparent and fair agricultural deals.
+        </p>
+        <div className="mx-auto flex min-h-[570px] max-w-[1120px] items-center px-5 pb-10 pt-8 sm:min-h-[610px] sm:px-8 lg:min-h-[660px] lg:pb-0">
+          <div className="max-w-[520px] pt-6 lg:pt-0">
+            <p className="mb-5 max-w-[500px] text-center text-xl font-black leading-8 text-[#33291F] drop-shadow-[0_1px_0_rgba(244,239,228,0.9)] sm:text-2xl lg:text-left">
+              A trusted mandi platform for fair crop prices, direct buyer connections and transparent agricultural trade.
             </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link to="/signup" className="inline-flex items-center gap-2 rounded-md bg-[#B96832] px-5 py-3 text-sm font-bold text-white shadow-[0_10px_18px_rgba(185,104,50,0.24)] transition hover:bg-[#9D5529]">
-                Get Started <ArrowRight size={16} />
-              </Link>
-              <Link to="/login" className="inline-flex items-center gap-2 rounded-md border border-[#D8CDBB] bg-[#F4EFE4]/82 px-5 py-3 text-sm font-bold text-[#33291F] shadow-sm transition hover:bg-[#F4EFE4]">
-                Login
-              </Link>
-            </div>
+            <Link to="/signup" className="mx-auto inline-flex items-center gap-2 rounded-md bg-[#B96832] px-5 py-3 text-sm font-bold text-white shadow-[0_10px_18px_rgba(185,104,50,0.24)] transition hover:bg-[#9D5529] lg:mx-0">
+              Get Started <ArrowRight size={16} />
+            </Link>
           </div>
-
-          <HeroIllustration />
         </div>
       </section>
 
-      <section id="about" className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+      <section id="about" className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
         <div className="max-w-2xl">
           <p className="text-sm font-black uppercase text-[#B96832]">About FairTrade</p>
           <h2 className="mt-2 text-3xl font-black text-[#33291F]">Connecting Farmers With Better Opportunities</h2>
@@ -125,7 +73,7 @@ export function Home() {
       </section>
 
       <section id="how-it-works" className="bg-[#E9E1D2]">
-        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
           <h2 className="text-2xl font-black text-[#33291F]">How It Works</h2>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {steps.map(([title, Icon], index) => (
@@ -141,7 +89,7 @@ export function Home() {
         </div>
       </section>
 
-      <section id="stakeholders" className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+      <section id="stakeholders" className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
         <h2 className="text-2xl font-black text-[#33291F]">Mandi Stakeholders</h2>
         <div className="mt-6 grid gap-4 md:grid-cols-3">
           {stakeholders.map(([title, Icon, detail]) => (
@@ -157,7 +105,7 @@ export function Home() {
       </section>
 
       <section className="bg-[#F4EFE4]">
-        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
           <h2 className="text-2xl font-black text-[#33291F]">Why FairTrade</h2>
           <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {benefits.map((title) => (
@@ -170,7 +118,7 @@ export function Home() {
         </div>
       </section>
 
-      <section id="contact" className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+      <section id="contact" className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
         <div className="grid gap-5 rounded-md bg-[#555633] p-7 md:grid-cols-[1fr_auto] md:items-center">
           <div>
             <h2 className="text-2xl font-black text-[#F4EFE4]">Ready to trade smarter?</h2>

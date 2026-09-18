@@ -56,11 +56,11 @@ export function Login({ initialMode = "login" }: { initialMode?: "login" | "sign
   }
 
   return (
-    <div className="grid min-h-[calc(100vh-2.5rem)] place-items-center bg-[#F4EFE4] px-4 py-8">
+    <div className="grid min-h-[calc(100vh-101px)] place-items-center bg-[#F4EFE4] px-4 py-8">
       <div className="grid w-full max-w-5xl overflow-hidden rounded-md border border-[#D8CDBB] bg-[#E9E1D2] shadow-soft lg:grid-cols-[0.9fr_1.1fr]">
         <section className="relative hidden min-h-[620px] overflow-hidden bg-[#555633] lg:block">
           <img
-            src="https://images.unsplash.com/photo-1625246333195-78d9c38ad449?auto=format&fit=crop&w=900&q=80"
+            src="/assets/image2.png"
             alt="Farmer using a modern agriculture platform"
             className="h-full w-full object-cover"
           />
