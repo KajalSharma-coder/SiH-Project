@@ -37,7 +37,7 @@ app.post("/api/auth/register", async (req, res) => {
       return res.status(400).json({ error: "Role, Name, Email/Mobile and Password are required." });
     }
 
-    const existing = await get("SELECT * FROM users WHERE identifier = ?", [identifier.trim()]);
+    const existing = await get("SELECT * FROM users WHERE identifier = $1", [identifier.trim()]);
     if (existing) {
       return res.status(400).json({ error: "User with this email/mobile already exists." });
     }
@@ -46,7 +46,7 @@ app.post("/api/auth/register", async (req, res) => {
     const userId = `${role === "Farmer" ? "F" : "B"}-${Math.floor(100 + Math.random() * 900)}`;
 
     await run(
-      "INSERT INTO users (id, role, name, identifier, password_hash) VALUES (?, ?, ?, ?, ?)",
+      "INSERT INTO users (id, role, name, identifier, password_hash) VALUES ($1, $2, $3, $4, $5)",
       [userId, role, name.trim(), identifier.trim(), hashedPassword]
     );
 
@@ -68,7 +68,7 @@ app.post("/api/auth/login", async (req, res) => {
       return res.status(400).json({ error: "Email/Mobile and Password are required." });
     }
 
-    const user = await get("SELECT * FROM users WHERE identifier = ?", [identifier.trim()]);
+    const user = await get("SELECT * FROM users WHERE identifier = $1", [identifier.trim()]);
     if (!user) {
       return res.status(401).json({ error: "Invalid credentials. User not found." });
     }
@@ -91,7 +91,7 @@ app.post("/api/auth/login", async (req, res) => {
 // Auth check / Current User
 app.get("/api/auth/me", authenticateToken, async (req, res) => {
   try {
-    const user = await get("SELECT id, role, name, identifier, created_at FROM users WHERE id = ?", [req.user.id]);
+    const user = await get("SELECT id, role, name, identifier, created_at FROM users WHERE id = $1", [req.user.id]);
     if (!user) return res.status(404).json({ error: "User not found" });
     res.json({ user });
   } catch (err) {
@@ -161,7 +161,7 @@ app.post("/api/lots", authenticateToken, async (req, res) => {
     const farmerName = req.user.name;
 
     await run(
-      `INSERT INTO lots (id, farmer_id, farmer_name, crop, grade, declared_quality, lab_status, quantity_qt, expected_price, city, mandi, reliability, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO lots (id, farmer_id, farmer_name, crop, grade, declared_quality, lab_status, quantity_qt, expected_price, city, mandi, reliability, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [id, farmerId, farmerName, crop, grade, declaredQuality || "Standard quality produce", "Pending", Number(quantityQt), Number(expectedPrice), city, mandi, 90, "Active"]
     );
 
@@ -206,7 +206,7 @@ app.post("/api/demands", authenticateToken, async (req, res) => {
     const buyerName = req.user.name;
 
     await run(
-      `INSERT INTO demands (id, buyer_id, buyer_name, crop, grade, quantity_qt, min_price, max_price, city, mandi) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO demands (id, buyer_id, buyer_name, crop, grade, quantity_qt, min_price, max_price, city, mandi) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [id, buyerId, buyerName, crop, grade, Number(quantityQt), Number(minPrice), Number(maxPrice), city, mandi]
     );
 
@@ -249,7 +249,7 @@ app.get("/api/deals", async (req, res) => {
 
 app.get("/api/deals/:id", async (req, res) => {
   try {
-    const r = await get("SELECT * FROM deals WHERE id = ?", [req.params.id]);
+    const r = await get("SELECT * FROM deals WHERE id = $1", [req.params.id]);
     if (!r) return res.status(404).json({ error: "Deal not found" });
     const formatted = {
       id: r.id,
@@ -281,7 +281,7 @@ app.patch("/api/deals/:id", authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { transactionMode, paymentGiven, paymentReceived, status } = req.body;
 
-    const existing = await get("SELECT * FROM deals WHERE id = ?", [id]);
+    const existing = await get("SELECT * FROM deals WHERE id = $1", [id]);
     if (!existing) return res.status(404).json({ error: "Deal not found" });
 
     const newMode = transactionMode !== undefined ? transactionMode : existing.transaction_mode;
@@ -290,11 +290,11 @@ app.patch("/api/deals/:id", authenticateToken, async (req, res) => {
     const newStatus = status !== undefined ? status : existing.status;
 
     await run(
-      `UPDATE deals SET transaction_mode = ?, payment_given = ?, payment_received = ?, status = ? WHERE id = ?`,
+      `UPDATE deals SET transaction_mode = $1, payment_given = $2, payment_received = $3, status = $4 WHERE id = $5`,
       [newMode, newGiven, newReceived, newStatus, id]
     );
 
-    const updated = await get("SELECT * FROM deals WHERE id = ?", [id]);
+    const updated = await get("SELECT * FROM deals WHERE id = $1", [id]);
     res.json({
       id: updated.id,
       farmer: updated.farmer,
@@ -323,7 +323,7 @@ app.patch("/api/deals/:id", authenticateToken, async (req, res) => {
 // Chat Messages for Deal Room
 app.get("/api/deals/:id/chat", async (req, res) => {
   try {
-    const rows = await all("SELECT * FROM chat_messages WHERE deal_id = ? ORDER BY created_at ASC", [req.params.id]);
+    const rows = await all("SELECT * FROM chat_messages WHERE deal_id = $1 ORDER BY created_at ASC", [req.params.id]);
     const formatted = rows.map((r) => ({
       id: r.id,
       dealId: r.deal_id,
@@ -350,7 +350,7 @@ app.post("/api/deals/:id/chat", authenticateToken, async (req, res) => {
     const time = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
 
     await run(
-      `INSERT INTO chat_messages (id, deal_id, sender, text, time) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO chat_messages (id, deal_id, sender, text, time) VALUES ($1, $2, $3, $4, $5)`,
       [msgId, id, sender, text.trim(), time]
     );
 
@@ -368,7 +368,7 @@ app.post("/api/quality/samples", authenticateToken, async (req, res) => {
     const sampleId = `FT-SMP-2026-${Math.floor(3000 + Math.random() * 6000)}`;
 
     if (lotId) {
-      await run("UPDATE lots SET lab_status = ? WHERE id = ?", ["Submitted", lotId]);
+      await run("UPDATE lots SET lab_status = $1 WHERE id = $2", ["Submitted", lotId]);
     }
 
     res.json({ sampleId, status: "Submitted", message: "Sample registered successfully for lab testing." });
