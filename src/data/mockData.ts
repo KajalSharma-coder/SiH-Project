@@ -2,9 +2,36 @@ import type { Activity, Deal, Demand, ForecastPoint, Grade, Lot, MarketQuote } f
 
 const crops = ["Wheat", "Rice", "Mustard", "Maize", "Gram"] as const;
 const grades: Grade[] = ["FAQ", "A", "Premium", "Lab Verified", "Organic"];
+const jaipurMandis = [
+  "Chandpole Mandi",
+  "Sanganer Mandi",
+  "Chomu (Grain)",
+  "Jaipur (Grain)",
+  "Jaipur(Grain)(Chandpole)",
+  "Kishan Renwal(Fulera)",
+  "Kishangarh Renwal",
+  "Kotputli",
+  "Sambhar (Kishangarh renwal)",
+  "Bagru",
+  "Chaksu",
+  "Bassi",
+  "Kotputli(Pawla)",
+  "Chomu (F&V)",
+  "Jaipur(Grain)(Sodala)",
+  "Dudu APMC",
+  "Bassi APMC",
+  "Chomu Grain APMC",
+  "Chaksu APMC",
+  "Kishangarh Renwal APMC",
+  "Bagru APMC",
+  "Rajdhanai Mandi (KukarKheda)",
+  "Rajdhanai Mandi (KukarKheda) APMC",
+  "Rajdhanai Mandi KukarKheda APMC",
+  "Jaipur (Grain) APMC",
+];
 const locations = [
   { state: "Rajasthan", city: "Kota", mandis: ["Ramganj Mandi", "Kota Krishi Upaj Mandi"] },
-  { state: "Rajasthan", city: "Jaipur", mandis: ["Chandpole Mandi", "Sanganer Mandi"] },
+  { state: "Rajasthan", city: "Jaipur", mandis: jaipurMandis },
   { state: "Rajasthan", city: "Bundi", mandis: ["Bundi Mandi", "Keshoraipatan Mandi"] },
   { state: "Rajasthan", city: "Alwar", mandis: ["Alwar Mandi", "Khairthal Mandi"] },
   { state: "Rajasthan", city: "Ajmer", mandis: ["Ajmer Mandi", "Kishangarh Mandi"] },

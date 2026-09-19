@@ -2,6 +2,7 @@ import { Filter, HandCoins, Package, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useI18n } from "../context/I18nContext";
 import { getDemands, getLots, startDeal } from "../services/api";
 import type { Demand, Lot } from "../types";
 import { money } from "../utils/format";
@@ -13,6 +14,7 @@ function unique(values: string[]) {
 }
 
 export function Marketplace() {
+  const { t } = useI18n();
   const [lots, setLots] = useState<Lot[]>([]);
   const [demands, setDemands] = useState<Demand[]>([]);
   const [crop, setCrop] = useState("All");
@@ -42,27 +44,27 @@ export function Marketplace() {
   );
 
   if (loading) {
-    return <Loading text="Loading marketplace..." />;
+    return <Loading text={t("market.loading")} />;
   }
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Marketplace" subtitle="Available produce lots and buyer requirements from the database." />
+      <PageHeader title={t("market.title")} subtitle={t("market.subtitle")} />
 
       <section className="rounded-md border border-[#D8CDBB] bg-white p-4 shadow-sm">
         <div className="mb-3 flex items-center gap-2 text-sm font-bold">
           <Filter size={17} className="text-[#B96832]" />
-          Filters
+          {t("common.filters")}
         </div>
         <div className="grid gap-3 md:grid-cols-3">
           <select value={crop} onChange={(event) => setCrop(event.target.value)} className={inputClass}>
-            {unique(lots.map((lot) => lot.crop)).map((value) => <option key={value}>{value}</option>)}
+            {unique(lots.map((lot) => lot.crop)).map((value) => <option key={value} value={value}>{value === "All" ? t("common.all") : value}</option>)}
           </select>
           <select value={region} onChange={(event) => setRegion(event.target.value)} className={inputClass}>
-            {unique(lots.flatMap((lot) => [lot.city, lot.mandi])).map((value) => <option key={value}>{value}</option>)}
+            {unique(lots.flatMap((lot) => [lot.city, lot.mandi])).map((value) => <option key={value} value={value}>{value === "All" ? t("common.all") : value}</option>)}
           </select>
           <select value={grade} onChange={(event) => setGrade(event.target.value)} className={inputClass}>
-            {unique(lots.map((lot) => lot.grade)).map((value) => <option key={value}>{value}</option>)}
+            {unique(lots.map((lot) => lot.grade)).map((value) => <option key={value} value={value}>{value === "All" ? t("common.all") : value}</option>)}
           </select>
         </div>
       </section>
@@ -70,7 +72,7 @@ export function Marketplace() {
       <section className="grid gap-4 xl:grid-cols-[1fr_360px]">
         <div className="space-y-3">
           {filteredLots.length === 0 ? (
-            <EmptyState text="No produce lots match these filters." />
+            <EmptyState text={t("market.noLots")} />
           ) : (
             filteredLots.map((lot) => <LotMarketCard key={lot.id} lot={lot} />)
           )}
@@ -79,13 +81,13 @@ export function Marketplace() {
         <aside className="rounded-md border border-[#D8CDBB] bg-white p-4 shadow-sm">
           <div className="flex items-center gap-2">
             <Search size={17} className="text-[#B96832]" />
-            <h2 className="font-black">Buyer Requirements</h2>
+            <h2 className="font-black">{t("market.buyerRequirements")}</h2>
           </div>
           <div className="mt-4 space-y-3">
             {demands.slice(0, 5).map((demand) => (
               <div key={demand.id} className="rounded-md bg-[#F4EFE4] p-3 text-sm">
                 <p className="font-bold">{demand.crop} - {demand.quantityQt} qt</p>
-                <p className="mt-1 text-xs text-[#765536]">{demand.buyerName} wants {demand.grade} in {demand.mandi}</p>
+                <p className="mt-1 text-xs text-[#765536]">{demand.buyerName} {t("market.wants")} {demand.grade} {t("market.in")} {demand.mandi}</p>
                 <p className="mt-2 text-xs font-bold text-[#33291F]">{money(demand.minPrice)} - {money(demand.maxPrice)}/qt</p>
               </div>
             ))}
@@ -102,6 +104,7 @@ export function Market() {
 
 function LotMarketCard({ lot }: { lot: Lot }) {
   const { user } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -114,11 +117,11 @@ function LotMarketCard({ lot }: { lot: Lot }) {
         lotId: lot.id,
         quantity: lot.quantityQt,
         pricePerUnit: lot.expectedPrice,
-        message: `Initial offer for ${lot.quantityQt} qt of ${lot.crop}.`,
+        message: t("market.initialOffer", { quantity: lot.quantityQt, crop: lot.crop }),
       });
       navigate(`/deal-room/${deal.id}`);
     } catch (err: any) {
-      setError(err.message || "Failed to start deal.");
+      setError(err.message || t("market.failedStartDeal"));
     } finally {
       setStarting(false);
     }
@@ -134,19 +137,19 @@ function LotMarketCard({ lot }: { lot: Lot }) {
           <div>
             <h2 className="font-black">{lot.crop}</h2>
             <p className="text-sm text-[#765536]">{lot.mandi}, {lot.city}</p>
-            <p className="mt-2 text-xs text-[#765536]">Farmer reliability: <b>{lot.reliability}%</b></p>
+            <p className="mt-2 text-xs text-[#765536]">{t("market.farmerReliability")}: <b>{lot.reliability}%</b></p>
           </div>
         </div>
         <div className="grid gap-2 text-sm sm:min-w-[360px] sm:grid-cols-4">
-          <Info label="Quantity" value={`${lot.quantityQt} qt`} />
-          <Info label="Grade" value={lot.grade} />
-          <Info label="Price" value={`${money(lot.expectedPrice)}/qt`} />
-          <Info label="Status" value={lot.status} />
+          <Info label={t("common.quantity")} value={`${lot.quantityQt} qt`} />
+          <Info label={t("common.grade")} value={lot.grade} />
+          <Info label={t("common.price")} value={`${money(lot.expectedPrice)}/qt`} />
+          <Info label={t("common.status")} value={lot.status} />
         </div>
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
         <Link to="/transactions" className="inline-flex items-center gap-2 rounded-md border border-[#555633] px-3 py-2 text-xs font-bold text-[#555633]">
-          View Details
+          {t("market.viewDetails")}
         </Link>
         <button
           type="button"
@@ -155,7 +158,7 @@ function LotMarketCard({ lot }: { lot: Lot }) {
           className="inline-flex items-center gap-2 rounded-md bg-[#B96832] px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
         >
           <HandCoins size={15} />
-          {starting ? "Opening..." : "Start Deal"}
+          {starting ? t("common.opening") : t("market.startDeal")}
         </button>
       </div>
       {error && <p className="mt-3 text-xs font-bold text-red-700">{error}</p>}

@@ -3,6 +3,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Section, StatCard } from "../components/Cards";
 import { useAuth } from "../context/AuthContext";
+import { useI18n } from "../context/I18nContext";
 import { createLot, getDeals, getDemands, getLots, registerSample } from "../services/api";
 import type { Crop, Deal, Demand, Grade, Lot } from "../types";
 import { money } from "../utils/format";
@@ -12,6 +13,7 @@ const inputClass = "w-full rounded-md border border-[#D8CDBB] bg-white px-3.5 py
 
 export function FarmerDashboard() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [lots, setLots] = useState<Lot[]>([]);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [demands, setDemands] = useState<Demand[]>([]);
@@ -28,7 +30,7 @@ export function FarmerDashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <Loading text="Loading farmer dashboard..." />;
+  if (loading) return <Loading text={t("common.loading")} />;
 
   const myLots = user ? lots.filter((lot) => lot.farmerId === user.id || lot.farmerName === user.name) : lots;
   const shownLots = myLots.length ? myLots : lots;
@@ -38,38 +40,38 @@ export function FarmerDashboard() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title={`Hello, ${user?.name || "Farmer"}`} subtitle="Your produce, buyer matches and transactions." />
+      <PageHeader title={t("dashboard.hello", { name: user?.name || t("role.Farmer") })} subtitle={t("dashboard.farmerSubtitle")} />
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="My Produce" value={String(shownLots.length)} helper="Listed lots" icon={Package} />
-        <StatCard label="Matched Buyers" value={String(demands.length)} helper="Open requirements" icon={Users} />
-        <StatCard label="Active Transactions" value={String(activeDeals.length)} helper="In progress" icon={Handshake} />
-        <StatCard label="Reliability Score" value={reliability ? `${reliability}%` : "No data"} helper="From listed produce" icon={ShieldCheck} />
+        <StatCard label={t("dashboard.myProduce")} value={String(shownLots.length)} helper={t("dashboard.listedLots")} icon={Package} />
+        <StatCard label={t("dashboard.matchedBuyers")} value={String(demands.length)} helper={t("dashboard.openRequirements")} icon={Users} />
+        <StatCard label={t("dashboard.activeTransactions")} value={String(activeDeals.length)} helper={t("dashboard.inProgress")} icon={Handshake} />
+        <StatCard label={t("dashboard.reliabilityScore")} value={reliability ? `${reliability}%` : t("dashboard.noData")} helper={t("dashboard.fromListedProduce")} icon={ShieldCheck} />
       </div>
 
       <section className="rounded-md border border-[#D8CDBB] bg-[#E9E1D2] p-4">
-        <h2 className="font-black">Quick Actions</h2>
+        <h2 className="font-black">{t("dashboard.quickActions")}</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <QuickAction to="/farmer/create-lot" icon={Plus} label="Add Produce" />
-          <QuickAction to="/marketplace" icon={Store} label="Marketplace" />
-          <QuickAction to="/price-prediction" icon={TrendingUp} label="Check Prices" />
-          <QuickAction to="/deal-room" icon={FileText} label="Deal Room" />
+          <QuickAction to="/farmer/create-lot" icon={Plus} label={t("dashboard.addProduce")} />
+          <QuickAction to="/marketplace" icon={Store} label={t("nav.marketplace")} />
+          <QuickAction to="/price-prediction" icon={TrendingUp} label={t("dashboard.checkPrices")} />
+          <QuickAction to="/deal-room" icon={FileText} label={t("nav.dealRoom")} />
         </div>
       </section>
 
-      <Section title="Recent Produce">
+      <Section title={t("dashboard.recentProduce")}>
         <div className="overflow-x-auto rounded-md border border-[#D8CDBB] bg-white">
           {shownLots.length === 0 ? (
-            <EmptyState text="No produce lots found." />
+            <EmptyState text={t("dashboard.noProduceLots")} />
           ) : (
             <table className="min-w-full text-left text-sm">
               <thead className="bg-[#F4EFE4] text-[#765536]">
                 <tr>
-                  <th className="p-4">Crop</th>
-                  <th className="p-4">Quantity</th>
-                  <th className="p-4">Grade</th>
-                  <th className="p-4">Price</th>
-                  <th className="p-4">Status</th>
+                  <th className="p-4">{t("common.crop")}</th>
+                  <th className="p-4">{t("common.quantity")}</th>
+                  <th className="p-4">{t("common.grade")}</th>
+                  <th className="p-4">{t("common.price")}</th>
+                  <th className="p-4">{t("common.status")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#D8CDBB]">
@@ -88,7 +90,7 @@ export function FarmerDashboard() {
         </div>
       </Section>
 
-      <Section title="My Deal Requests" subtitle="Incoming buyer offers and active negotiations for your lots.">
+      <Section title={t("dashboard.myDealRequests")} subtitle={t("dashboard.myDealRequestsSubtitle")}>
         <DealRequests deals={myDeals} />
       </Section>
     </div>
@@ -106,6 +108,7 @@ function QuickAction({ to, icon: Icon, label }: { to: string; icon: typeof Plus;
 
 export function CreateLot() {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -126,29 +129,29 @@ export function CreateLot() {
       });
       navigate("/farmer/dashboard");
     } catch (err: any) {
-      setError(err.message || "Failed to create lot.");
+      setError(err.message || t("forms.failedLot"));
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <FormPage title="Add Produce Lot" subtitle="Save crop, quantity, grade and expected price to the backend.">
+    <FormPage title={t("forms.addProduceLot")} subtitle={t("forms.addProduceSubtitle")}>
       {error && <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
       <form onSubmit={submit} className="grid gap-4 md:grid-cols-2">
-        <Select name="crop" label="Crop" options={["Wheat", "Rice", "Mustard", "Maize", "Gram"]} />
-        <Select name="grade" label="Grade" options={["FAQ", "A", "Premium", "Lab Verified", "Organic"]} />
-        <Field name="quantityQt" label="Quantity (quintals)" type="number" />
-        <Field name="expectedPrice" label="Expected price (Rs/qt)" type="number" />
-        <Field name="city" label="City" defaultValue="Kota" />
-        <Field name="mandi" label="Mandi" defaultValue="Ramganj Mandi" />
+        <Select name="crop" label={t("common.crop")} options={["Wheat", "Rice", "Mustard", "Maize", "Gram"]} />
+        <Select name="grade" label={t("common.grade")} options={["FAQ", "A", "Premium", "Lab Verified", "Organic"]} />
+        <Field name="quantityQt" label={t("forms.quantityQuintals")} type="number" />
+        <Field name="expectedPrice" label={t("forms.expectedPrice")} type="number" />
+        <Field name="city" label={t("common.city")} defaultValue="Kota" />
+        <Field name="mandi" label={t("common.mandi")} defaultValue="Ramganj Mandi" />
         <label className="md:col-span-2">
-          <span className="mb-1 block text-xs font-bold text-[#765536]">Quality notes</span>
-          <textarea name="declaredQuality" required className={`${inputClass} min-h-28`} placeholder="Moisture, grain size, packaging..." />
+          <span className="mb-1 block text-xs font-bold text-[#765536]">{t("forms.qualityNotes")}</span>
+          <textarea name="declaredQuality" required className={`${inputClass} min-h-28`} placeholder={t("forms.qualityPlaceholder")} />
         </label>
         <div className="md:col-span-2 flex justify-end gap-3">
-          <Link to="/farmer/dashboard" className="rounded-md border border-[#555633] px-5 py-3 text-sm font-bold text-[#555633]">Cancel</Link>
-          <button disabled={submitting} className="rounded-md bg-[#555633] px-5 py-3 text-sm font-bold text-[#F4EFE4]">{submitting ? "Saving..." : "Save Produce"}</button>
+          <Link to="/farmer/dashboard" className="rounded-md border border-[#555633] px-5 py-3 text-sm font-bold text-[#555633]">{t("common.cancel")}</Link>
+          <button disabled={submitting} className="rounded-md bg-[#555633] px-5 py-3 text-sm font-bold text-[#F4EFE4]">{submitting ? t("common.saving") : t("forms.saveProduce")}</button>
         </div>
       </form>
     </FormPage>
@@ -156,6 +159,7 @@ export function CreateLot() {
 }
 
 export function QualityPassport() {
+  const { t, statusLabel } = useI18n();
   const [lots, setLots] = useState<Lot[]>([]);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -165,13 +169,13 @@ export function QualityPassport() {
 
   async function handleRegister(lotId?: string) {
     const result = await registerSample(lotId);
-    setMessage(`Sample ${result.sampleId} is ${result.status}.`);
+    setMessage(t("quality.sampleMessage", { sampleId: result.sampleId, status: statusLabel(result.status) }));
     setLots(await getLots());
   }
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Quality" subtitle="Simple sample status, lab result and FairTrade grade." />
+      <PageHeader title={t("quality.title")} subtitle={t("quality.subtitle")} />
       {message && <div className="rounded-md border border-[#D8CDBB] bg-[#E9E1D2] p-3 text-sm font-bold text-[#B96832]">{message}</div>}
       <div className="grid gap-3 md:grid-cols-2">
         {lots.map((lot, index) => (
@@ -184,13 +188,13 @@ export function QualityPassport() {
               <span className="rounded-full bg-[#E9E1D2] px-3 py-1 text-xs font-bold text-[#B96832]">{lot.labStatus}</span>
             </div>
             <div className="mt-4 grid gap-2 sm:grid-cols-3">
-              <Info label="Sample Status" value={lot.labStatus} />
-              <Info label="Lab Result" value={lot.labStatus === "Verified" ? "Passed" : "Pending"} />
-              <Info label="FairTrade Grade" value={lot.labStatus === "Verified" ? lot.grade : "Awaited"} />
+              <Info label={t("quality.sampleStatus")} value={lot.labStatus} />
+              <Info label={t("quality.labResult")} value={lot.labStatus === "Verified" ? t("quality.passed") : t("quality.pending")} />
+              <Info label={t("quality.fairTradeGrade")} value={lot.labStatus === "Verified" ? lot.grade : t("quality.awaited")} />
             </div>
             <button onClick={() => handleRegister(lot.id)} className="mt-4 inline-flex items-center gap-2 rounded-md bg-[#B96832] px-3 py-2 text-xs font-bold text-white">
               <Plus size={15} />
-              Register Sample
+              {t("quality.registerSample")}
             </button>
           </article>
         ))}
@@ -200,13 +204,14 @@ export function QualityPassport() {
 }
 
 export function FarmerMatches() {
+  const { t } = useI18n();
   const [demands, setDemands] = useState<Demand[]>([]);
   useEffect(() => {
     getDemands().then(setDemands).catch(console.error);
   }, []);
 
   return (
-    <Section title="Matched Buyers">
+    <Section title={t("dashboard.matchedBuyers")}>
       <div className="grid gap-3 md:grid-cols-2">
         {demands.map((demand) => (
           <article key={demand.id} className="rounded-md border border-[#D8CDBB] bg-white p-4">
@@ -259,19 +264,20 @@ function Info({ label, value }: { label: string; value: string }) {
 }
 
 function DealRequests({ deals }: { deals: Deal[] }) {
-  if (deals.length === 0) return <EmptyState text="No incoming deal requests yet." />;
+  const { t, statusLabel } = useI18n();
+  if (deals.length === 0) return <EmptyState text={t("dashboard.noIncomingDeals")} />;
 
   return (
     <div className="overflow-x-auto rounded-md border border-[#D8CDBB] bg-white">
       <table className="min-w-full text-left text-sm">
         <thead className="bg-[#F4EFE4] text-[#765536]">
           <tr>
-            <th className="p-4">Buyer</th>
-            <th className="p-4">Produce</th>
-            <th className="p-4">Quantity</th>
-            <th className="p-4">Offer Price</th>
-            <th className="p-4">Status</th>
-            <th className="p-4">Action</th>
+            <th className="p-4">{t("common.buyer")}</th>
+            <th className="p-4">{t("common.produce")}</th>
+            <th className="p-4">{t("common.quantity")}</th>
+            <th className="p-4">{t("dashboard.offerPrice")}</th>
+            <th className="p-4">{t("common.status")}</th>
+            <th className="p-4">{t("common.action")}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-[#D8CDBB]">
@@ -281,8 +287,8 @@ function DealRequests({ deals }: { deals: Deal[] }) {
               <td className="p-4">{deal.crop}<span className="block text-xs text-[#765536]">{deal.lotId}</span></td>
               <td className="p-4">{deal.quantityQt} qt</td>
               <td className="p-4 font-bold text-[#33291F]">{money(deal.offer || deal.agreedPrice)}/qt</td>
-              <td className="p-4"><span className="rounded-full bg-[#E9E1D2] px-3 py-1 text-xs font-bold text-[#B96832]">{deal.status.replaceAll("_", " ")}</span></td>
-              <td className="p-4"><Link to={`/deal-room/${deal.id}`} className="text-xs font-bold text-[#B96832] hover:underline">Open Deal Room</Link></td>
+              <td className="p-4"><span className="rounded-full bg-[#E9E1D2] px-3 py-1 text-xs font-bold text-[#B96832]">{statusLabel(deal.status)}</span></td>
+              <td className="p-4"><Link to={`/deal-room/${deal.id}`} className="text-xs font-bold text-[#B96832] hover:underline">{t("transactions.openDeal")}</Link></td>
             </tr>
           ))}
         </tbody>

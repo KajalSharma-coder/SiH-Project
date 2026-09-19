@@ -1,4 +1,5 @@
 import type { MarketQuote } from "../types";
+import { useI18n } from "../context/I18nContext";
 
 type Props = {
   quote: MarketQuote;
@@ -11,6 +12,7 @@ function unique(values: string[]) {
 }
 
 export function MarketSelector({ quote, quotes, onChange }: Props) {
+  const { t } = useI18n();
   if (!quote || quotes.length === 0) return null;
 
   const states = unique(quotes.map((item) => item.state));
@@ -34,11 +36,11 @@ export function MarketSelector({ quote, quotes, onChange }: Props) {
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
       {[
-        ["State", "state", states],
-        ["City", "city", cities],
-        ["Mandi", "mandi", mandis],
-        ["Crop", "crop", crops],
-        ["Grade", "grade", grades],
+        [t("common.state"), "state", states],
+        [t("common.city"), "city", cities],
+        [t("common.mandi"), "mandi", mandis],
+        [t("common.crop"), "crop", crops],
+        [t("common.grade"), "grade", grades],
       ].map(([label, field, options]) => (
         <label key={field as string} className="text-xs font-bold uppercase tracking-wider text-[#765536]">
           {label as string}

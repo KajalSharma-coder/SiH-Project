@@ -3,11 +3,13 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FairTradeLogo } from "../components/Logo";
 import { useAuth } from "../context/AuthContext";
+import { useI18n } from "../context/I18nContext";
 
 export function Login({ initialMode = "login" }: { initialMode?: "login" | "signup" }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user: currentUser, loading, login, signup } = useAuth();
+  const { t, roleLabel } = useI18n();
   const [isSignup, setIsSignup] = useState(initialMode === "signup");
   const [role, setRole] = useState<"Farmer" | "Buyer">("Farmer");
   const [error, setError] = useState<string | null>(null);
@@ -40,8 +42,8 @@ export function Login({ initialMode = "login" }: { initialMode?: "login" | "sign
 
     try {
       if (isSignup) {
-        if (!name) throw new Error("Please enter your name.");
-        if (password !== confirmPassword) throw new Error("Passwords do not match.");
+        if (!name) throw new Error(t("auth.enterName"));
+        if (password !== confirmPassword) throw new Error(t("auth.passwordMismatch"));
         const user = await signup(role, name, identifier, password);
         navigate(fromPath || (user.role === "Farmer" ? "/farmer/dashboard" : "/buyer/dashboard"));
       } else {
@@ -49,7 +51,7 @@ export function Login({ initialMode = "login" }: { initialMode?: "login" | "sign
         navigate(fromPath || (user.role === "Farmer" ? "/farmer/dashboard" : "/buyer/dashboard"));
       }
     } catch (err: any) {
-      setError(err.message || "Authentication failed.");
+      setError(err.message || t("auth.failed"));
     } finally {
       setSubmitting(false);
     }
@@ -69,8 +71,8 @@ export function Login({ initialMode = "login" }: { initialMode?: "login" | "sign
             <FairTradeLogo size="lg" clickable={false} />
           </div>
           <div className="absolute bottom-8 left-8 max-w-sm text-white">
-            <h1 className="text-3xl font-black leading-tight">Simple access to fair agricultural trade.</h1>
-            <p className="mt-3 text-sm leading-6 text-[#F4EFE4]/85">Login to manage produce, requirements, prices and transactions.</p>
+            <h1 className="text-3xl font-black leading-tight">{t("auth.simpleAccess")}</h1>
+            <p className="mt-3 text-sm leading-6 text-[#F4EFE4]/85">{t("auth.heroText")}</p>
           </div>
         </section>
 
@@ -79,8 +81,8 @@ export function Login({ initialMode = "login" }: { initialMode?: "login" | "sign
             <FairTradeLogo size="lg" clickable={false} />
           </div>
           <div className="mt-8 lg:mt-0">
-            <h2 className="text-2xl font-black text-[#33291F]">{isSignup ? "Create Account" : "Welcome Back"}</h2>
-            <p className="mt-1 text-sm text-[#765536]">{isSignup ? "Join FairTrade as a farmer or buyer." : "Login to your FairTrade account."}</p>
+            <h2 className="text-2xl font-black text-[#33291F]">{isSignup ? t("auth.createAccount") : t("auth.welcomeBack")}</h2>
+            <p className="mt-1 text-sm text-[#765536]">{isSignup ? t("auth.join") : t("auth.loginAccount")}</p>
           </div>
 
           <div className="mt-6 grid grid-cols-2 gap-2 rounded-md bg-[#F4EFE4] p-1">
@@ -96,7 +98,7 @@ export function Login({ initialMode = "login" }: { initialMode?: "login" | "sign
                   }`}
                 >
                   <Icon size={16} />
-                  {option}
+                  {roleLabel(option)}
                 </button>
               );
             })}
@@ -112,51 +114,51 @@ export function Login({ initialMode = "login" }: { initialMode?: "login" | "sign
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             {isSignup && (
               <label className="block">
-                <span className="mb-1 block text-xs font-bold text-[#765536]">Name</span>
+                <span className="mb-1 block text-xs font-bold text-[#765536]">{t("auth.name")}</span>
                 <div className="relative">
                   <UserIcon className="absolute left-3 top-3.5 text-[#765536]" size={16} />
-                  <input name="name" className={`${inputClass} pl-10`} placeholder={role === "Farmer" ? "Farmer name" : "Buyer organization"} />
+                  <input name="name" className={`${inputClass} pl-10`} placeholder={role === "Farmer" ? t("auth.farmerName") : t("auth.buyerOrganization")} />
                 </div>
               </label>
             )}
 
             <label className="block">
-              <span className="mb-1 block text-xs font-bold text-[#765536]">Email / Mobile</span>
+              <span className="mb-1 block text-xs font-bold text-[#765536]">{t("auth.emailMobile")}</span>
               <div className="relative">
                 <Mail className="absolute left-3 top-3.5 text-[#765536]" size={16} />
-                <input name="identifier" required className={`${inputClass} pl-10`} placeholder="Email or mobile number" />
+                <input name="identifier" required className={`${inputClass} pl-10`} placeholder={t("auth.emailPlaceholder")} />
               </div>
             </label>
 
             <label className="block">
-              <span className="mb-1 block text-xs font-bold text-[#765536]">Password</span>
+              <span className="mb-1 block text-xs font-bold text-[#765536]">{t("auth.password")}</span>
               <div className="relative">
                 <Lock className="absolute left-3 top-3.5 text-[#765536]" size={16} />
-                <input name="password" required type="password" className={`${inputClass} pl-10`} placeholder="Password" />
+                <input name="password" required type="password" className={`${inputClass} pl-10`} placeholder={t("auth.password")} />
               </div>
             </label>
 
             {isSignup && (
               <label className="block">
-                <span className="mb-1 block text-xs font-bold text-[#765536]">Confirm Password</span>
-                <input name="confirmPassword" required type="password" className={inputClass} placeholder="Confirm password" />
+                <span className="mb-1 block text-xs font-bold text-[#765536]">{t("auth.confirmPassword")}</span>
+                <input name="confirmPassword" required type="password" className={inputClass} placeholder={t("auth.confirmPasswordPlaceholder")} />
               </label>
             )}
 
             <button disabled={submitting} className="w-full rounded-md bg-[#B96832] py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#9D5529] disabled:opacity-60">
-              {submitting ? "Please wait..." : isSignup ? "Sign Up" : "Login"}
+              {submitting ? t("auth.pleaseWait") : isSignup ? t("auth.signUp") : t("auth.login")}
             </button>
           </form>
 
           <p className="mt-5 text-center text-sm text-[#765536]">
-            {isSignup ? "Already have an account?" : "Don't have an account?"}{" "}
+            {isSignup ? t("auth.alreadyAccount") : t("auth.noAccount")}{" "}
             <button className="font-bold text-[#B96832]" onClick={() => setIsSignup((value) => !value)}>
-              {isSignup ? "Login" : "Sign Up"}
+              {isSignup ? t("auth.login") : t("auth.signUp")}
             </button>
           </p>
 
           <p className="mt-10 text-center text-xs text-[#765536]">
-            <Link to="/" className="font-bold text-[#B96832]">FairTrade</Link> keeps the flow simple and connected to your backend.
+            <Link to="/" className="font-bold text-[#B96832]">FairTrade</Link> {t("auth.footer")}
           </p>
         </section>
       </div>

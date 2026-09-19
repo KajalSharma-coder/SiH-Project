@@ -5,12 +5,14 @@ import { Section, StatCard } from "../components/Cards";
 import { FairTradeLogo } from "../components/Logo";
 import { acceptDealOffer, getChatMessages, getDealById, getDealOffers, getDeals, markPaymentReceived, markPaymentSent, rejectDealOffer, sendChatMessage, sendCounterOffer, sendDealOffer } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import { useI18n } from "../context/I18nContext";
 import type { ChatMessage, Deal, DealOffer } from "../types";
 import { money, number } from "../utils/format";
 
 export function DealRoom() {
   const { id = "DL-9001" } = useParams();
   const { user } = useAuth();
+  const { t, roleLabel, statusLabel, paymentLabel } = useI18n();
   const [deal, setDeal] = useState<Deal | null>(null);
   const [offers, setOffers] = useState<DealOffer[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -32,7 +34,7 @@ export function DealRoom() {
         setMessages(mData);
       } catch (err: any) {
         console.error("Error loading deal room:", err);
-        setError(err.message || "Unable to load deal room.");
+        setError(err.message || t("deal.notFound"));
       } finally {
         setLoading(false);
       }
@@ -45,14 +47,14 @@ export function DealRoom() {
       <div className="grid min-h-[400px] place-items-center rounded-2xl bg-white p-8 shadow-soft">
         <div className="flex items-center gap-3 text-[#B96832] font-semibold">
           <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#B96832] border-t-transparent" />
-          Loading Deal Room...
+          {t("deal.loadingRoom")}
         </div>
       </div>
     );
   }
 
   if (!deal) {
-    return <div className="rounded-md border border-red-200 bg-red-50 p-5 text-sm font-bold text-red-700">{error || "Deal not found."}</div>;
+    return <div className="rounded-md border border-red-200 bg-red-50 p-5 text-sm font-bold text-red-700">{error || t("deal.notFound")}</div>;
   }
 
   const isBuyer = user?.id === deal.buyerId;
@@ -88,7 +90,7 @@ export function DealRoom() {
       event.currentTarget.reset();
       await reloadDeal();
     } catch (err: any) {
-      setError(err.message || "Failed to send offer.");
+      setError(err.message || t("deal.failedOffer"));
     } finally {
       setActing(false);
     }
@@ -108,7 +110,7 @@ export function DealRoom() {
         setOffers(await getDealOffers(deal!.id));
       }
     } catch (err: any) {
-      setError(err.message || "Action failed.");
+      setError(err.message || t("deal.actionFailed"));
     } finally {
       setActing(false);
     }
@@ -137,44 +139,44 @@ export function DealRoom() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <span className="inline-flex items-center gap-2 rounded-full bg-[#E9E1D2] px-3.5 py-1.5 text-xs font-bold text-[#B96832]">
-            <Handshake size={16} /> {isBuyer ? "Buyer Deal Room" : isFarmer ? "Farmer Deal Room" : "Deal Room"}
+            <Handshake size={16} /> {isBuyer ? t("deal.buyerRoom") : isFarmer ? t("deal.farmerRoom") : t("deal.room")}
           </span>
-          <h1 className="mt-2 text-3xl font-black tracking-tight text-[#33291F]">Deal #{deal.id}</h1>
+          <h1 className="mt-2 text-3xl font-black tracking-tight text-[#33291F]">{t("deal.title", { id: deal.id })}</h1>
           <p className="text-sm text-[#765536] mt-0.5">
-            Negotiate privately, confirm payment step by step, and keep the deal record in one place.
+            {t("deal.subtitle")}
           </p>
         </div>
         <Link
           to={`/bill/${deal.id}`}
           className="inline-flex items-center gap-2 rounded-xl bg-[#B96832] px-5 py-3 text-sm font-bold text-white shadow-md transition hover:bg-[#9D5529]"
         >
-          <FileText size={18} /> View Digital Bill
+          <FileText size={18} /> {t("deal.viewBill")}
         </Link>
       </div>
 
       {error && <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label={["AGREED", "PAYMENT_PENDING", "PAYMENT_SENT", "COMPLETED"].includes(deal.status) ? "Agreed Rate" : "Current Offer"} value={`${money(currentPrice)}/Qt`} icon={IndianRupee} />
-        <StatCard label="Total Amount" value={money(total)} icon={IndianRupee} />
-        <StatCard label="Deal Status" value={deal.status.replaceAll("_", " ")} icon={RefreshCcw} />
-        <StatCard label="Payment Status" value={deal.paymentStatus} icon={IndianRupee} />
+        <StatCard label={["AGREED", "PAYMENT_PENDING", "PAYMENT_SENT", "COMPLETED"].includes(deal.status) ? t("deal.agreedRate") : t("deal.currentOffer")} value={`${money(currentPrice)}/Qt`} icon={IndianRupee} />
+        <StatCard label={t("deal.totalAmount")} value={money(total)} icon={IndianRupee} />
+        <StatCard label={t("deal.dealStatus")} value={statusLabel(deal.status)} icon={RefreshCcw} />
+        <StatCard label={t("deal.paymentStatus")} value={paymentLabel(deal.paymentStatus)} icon={IndianRupee} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
         <section className="rounded-2xl border border-[#D8CDBB] bg-white p-6 shadow-soft space-y-6">
           <div>
-            <h2 className="text-xl font-black text-[#33291F]">Deal Summary</h2>
+            <h2 className="text-xl font-black text-[#33291F]">{t("deal.summary")}</h2>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               {[
-                [isBuyer ? "Farmer" : "Buyer", isBuyer ? deal.farmer : deal.buyer],
-                ["Crop / Lot ID", `${deal.crop} - ${deal.lotId}`],
-                ["Quantity", `${number(currentQuantity)} Quintals`],
-                ["Quality Grade", deal.grade],
-                [["AGREED", "PAYMENT_PENDING", "PAYMENT_SENT", "COMPLETED"].includes(deal.status) ? "Agreed Rate" : "Current Price", `${money(currentPrice)} / Qt`],
-                ["Total Amount", money(total)],
-                ["Asking Price", `${money(deal.counterOffer || deal.agreedPrice)} / Qt`],
-                ["Date", deal.date],
+                [isBuyer ? t("common.farmer") : t("common.buyer"), isBuyer ? deal.farmer : deal.buyer],
+                [t("deal.cropLotId"), `${deal.crop} - ${deal.lotId}`],
+                [t("common.quantity"), `${number(currentQuantity)} ${t("common.quintal")}`],
+                [t("deal.qualityGrade"), deal.grade],
+                [["AGREED", "PAYMENT_PENDING", "PAYMENT_SENT", "COMPLETED"].includes(deal.status) ? t("deal.agreedRate") : t("deal.currentPrice"), `${money(currentPrice)} / Qt`],
+                [t("deal.totalAmount"), money(total)],
+                [t("deal.askingPrice"), `${money(deal.counterOffer || deal.agreedPrice)} / Qt`],
+                [t("common.date"), deal.date],
               ].map(([label, val]) => (
                 <div key={label} className="rounded-xl bg-[#F4EFE4] p-3.5 border border-[#D8CDBB]">
                   <span className="text-xs text-[#765536]">{label}</span>
@@ -185,18 +187,18 @@ export function DealRoom() {
           </div>
 
           <div className="rounded-xl border border-[#D8CDBB] p-5 bg-[#F4EFE4]">
-            <h3 className="text-lg font-extrabold text-[#33291F]">Negotiation</h3>
+            <h3 className="text-lg font-extrabold text-[#33291F]">{t("deal.negotiation")}</h3>
             <div className="mt-4 space-y-3">
               {offers.length === 0 ? (
-                <p className="text-sm text-[#765536]">No offers yet.</p>
+                <p className="text-sm text-[#765536]">{t("deal.noOffers")}</p>
               ) : (
                 offers.map((offer) => (
                   <div key={offer.id} className={`rounded-md border p-3 text-sm ${offer.senderRole === "Buyer" ? "border-[#B96832]/30 bg-white" : "border-[#555633]/30 bg-[#E9E1D2]"}`}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="font-black text-[#33291F]">{offer.senderRole}</p>
-                      <span className="rounded-full bg-[#F4EFE4] px-2.5 py-1 text-[11px] font-bold text-[#765536]">{offer.status}</span>
+                      <p className="font-black text-[#33291F]">{roleLabel(offer.senderRole)}</p>
+                      <span className="rounded-full bg-[#F4EFE4] px-2.5 py-1 text-[11px] font-bold text-[#765536]">{statusLabel(offer.status)}</span>
                     </div>
-                    <p className="mt-1 font-bold">{money(offer.pricePerUnit)}/qt for {number(offer.quantity)} qt</p>
+                    <p className="mt-1 font-bold">{t("deal.offerLine", { price: money(offer.pricePerUnit), quantity: number(offer.quantity) })}</p>
                     {offer.message && <p className="mt-1 text-xs text-[#765536]">{offer.message}</p>}
                   </div>
                 ))
@@ -206,28 +208,28 @@ export function DealRoom() {
             {!["AGREED", "PAYMENT_PENDING", "PAYMENT_SENT", "COMPLETED", "REJECTED", "CANCELLED"].includes(deal.status) && (
               <form onSubmit={handleOffer} className="mt-5 grid gap-3 md:grid-cols-[1fr_1fr]">
                 <label>
-                  <span className="mb-1 block text-xs font-bold text-[#765536]">Quantity (qt)</span>
+                  <span className="mb-1 block text-xs font-bold text-[#765536]">{t("deal.quantityQt")}</span>
                   <input name="quantity" required type="number" min="1" step="0.01" defaultValue={currentQuantity} className="w-full rounded-md border border-[#D8CDBB] px-3 py-2 text-sm outline-none focus:border-[#B96832]" />
                 </label>
                 <label>
-                  <span className="mb-1 block text-xs font-bold text-[#765536]">Price per qt</span>
+                  <span className="mb-1 block text-xs font-bold text-[#765536]">{t("deal.pricePerQt")}</span>
                   <input name="pricePerUnit" required type="number" min="1" step="0.01" defaultValue={currentPrice} className="w-full rounded-md border border-[#D8CDBB] px-3 py-2 text-sm outline-none focus:border-[#B96832]" />
                 </label>
                 <label className="md:col-span-2">
-                  <span className="mb-1 block text-xs font-bold text-[#765536]">Message</span>
-                  <textarea name="offerMessage" className="min-h-20 w-full rounded-md border border-[#D8CDBB] px-3 py-2 text-sm outline-none focus:border-[#B96832]" placeholder="Add a note with your offer" />
+                  <span className="mb-1 block text-xs font-bold text-[#765536]">{t("deal.message")}</span>
+                  <textarea name="offerMessage" className="min-h-20 w-full rounded-md border border-[#D8CDBB] px-3 py-2 text-sm outline-none focus:border-[#B96832]" placeholder={t("deal.offerMessagePlaceholder")} />
                 </label>
                 <div className="md:col-span-2 flex flex-wrap gap-2">
                   <button disabled={acting} className="inline-flex items-center gap-2 rounded-md bg-[#B96832] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-60">
-                    <Send size={15} /> {latestOffer ? "Send Counter Offer" : "Send Offer"}
+                    <Send size={15} /> {latestOffer ? t("deal.sendCounterOffer") : t("deal.sendOffer")}
                   </button>
                   {canRespondToLatest && (
                     <>
                       <button type="button" disabled={acting} onClick={() => handleDealAction("accept")} className="inline-flex items-center gap-2 rounded-md bg-[#555633] px-4 py-2.5 text-xs font-bold text-[#F4EFE4] disabled:opacity-60">
-                        <CheckCircle2 size={15} /> Accept Offer
+                        <CheckCircle2 size={15} /> {t("deal.acceptOffer")}
                       </button>
                       <button type="button" disabled={acting} onClick={() => handleDealAction("reject")} className="inline-flex items-center gap-2 rounded-md border border-red-200 bg-white px-4 py-2.5 text-xs font-bold text-red-700 disabled:opacity-60">
-                        <XCircle size={15} /> Reject Offer
+                        <XCircle size={15} /> {t("deal.rejectOffer")}
                       </button>
                     </>
                   )}
@@ -237,27 +239,27 @@ export function DealRoom() {
           </div>
 
           <div className="rounded-xl border border-[#D8CDBB] p-5 bg-white">
-            <h3 className="text-lg font-extrabold text-[#33291F]">Deal Status</h3>
+            <h3 className="text-lg font-extrabold text-[#33291F]">{t("deal.dealStatus")}</h3>
             <div className="mt-4 grid gap-2 sm:grid-cols-4">
               {["NEGOTIATING", "AGREED", "PAYMENT_SENT", "COMPLETED"].map((step) => (
                 <div key={step} className={`rounded-md border p-3 text-xs font-bold ${deal.status === step || (step === "NEGOTIATING" && deal.status === "COUNTER_OFFER") ? "border-[#B96832] bg-[#E9E1D2] text-[#B96832]" : "border-[#D8CDBB] bg-[#F4EFE4] text-[#765536]"}`}>
-                  {step.replaceAll("_", " ")}
+                  {statusLabel(step)}
                 </div>
               ))}
             </div>
             {isBuyer && (deal.status === "AGREED" || deal.status === "PAYMENT_PENDING") && (
               <button disabled={acting} onClick={() => handleDealAction("payment-sent")} className="mt-4 rounded-md bg-[#555633] px-4 py-2.5 text-xs font-bold text-[#F4EFE4] disabled:opacity-60">
-                Mark Payment Sent
+                {t("deal.markPaymentSent")}
               </button>
             )}
             {isBuyer && deal.status === "PAYMENT_SENT" && (
-              <p className="mt-4 rounded-md bg-[#F4EFE4] p-3 text-sm font-bold text-[#765536]">Payment Sent — Waiting for Farmer Confirmation</p>
+              <p className="mt-4 rounded-md bg-[#F4EFE4] p-3 text-sm font-bold text-[#765536]">{t("deal.paymentSentWaiting")}</p>
             )}
             {isFarmer && deal.status === "PAYMENT_SENT" && (
               <div className="mt-4 flex flex-wrap items-center gap-3">
-                <p className="rounded-md bg-[#F4EFE4] p-3 text-sm font-bold text-[#765536]">Payment Sent — Confirm Payment Received</p>
+                <p className="rounded-md bg-[#F4EFE4] p-3 text-sm font-bold text-[#765536]">{t("deal.paymentSentConfirm")}</p>
                 <button disabled={acting} onClick={() => handleDealAction("payment-received")} className="rounded-md bg-[#555633] px-4 py-2.5 text-xs font-bold text-[#F4EFE4] disabled:opacity-60">
-                  Mark Payment Received
+                  {t("deal.markPaymentReceived")}
                 </button>
               </div>
             )}
@@ -268,7 +270,7 @@ export function DealRoom() {
           <div>
             <div className="flex items-center gap-2 border-b border-[#D8CDBB] pb-3">
               <MessageSquare className="text-[#B96832]" size={20} />
-              <h2 className="text-xl font-black text-[#33291F]">Private Chat</h2>
+              <h2 className="text-xl font-black text-[#33291F]">{t("deal.privateChat")}</h2>
             </div>
 
             <div className="mt-4 space-y-3 overflow-y-auto max-h-[380px] pr-1">
@@ -288,7 +290,7 @@ export function DealRoom() {
             <input
               name="message"
               required
-              placeholder="Type message to negotiate..."
+              placeholder={t("deal.chatPlaceholder")}
               className="min-w-0 flex-1 rounded-xl border border-[#D8CDBB] px-3.5 py-3 text-xs outline-none focus:border-[#B96832]"
             />
             <button
@@ -307,6 +309,7 @@ export function DealRoom() {
 
 export function Transactions() {
   const { user } = useAuth();
+  const { t, statusLabel, paymentLabel } = useI18n();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [activeFilter, setActiveFilter] = useState<DealFilter>("All");
   const [loading, setLoading] = useState(true);
@@ -317,7 +320,7 @@ export function Transactions() {
       .then(setDeals)
       .catch((err: any) => {
         console.error(err);
-        setError(err.message || "Unable to load deals.");
+        setError(err.message || t("transactions.loadFailed"));
       })
       .finally(() => setLoading(false));
   }, []);
@@ -330,26 +333,26 @@ export function Transactions() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-black tracking-tight text-[#33291F]">Deal Room</h1>
+        <h1 className="text-3xl font-black tracking-tight text-[#33291F]">{t("transactions.title")}</h1>
         <p className="mt-1 text-sm text-[#765536]">
-          Your private deal history, negotiation rooms, payment status and digital bills.
+          {t("transactions.subtitle")}
         </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <StatCard label="Total Deals" value={String(deals.length)} icon={Handshake} />
-        <StatCard label="Active Deals" value={String(active)} icon={RefreshCcw} />
-        <StatCard label="Completed Deals" value={String(completed)} icon={CheckCircle2} />
+        <StatCard label={t("transactions.totalDeals")} value={String(deals.length)} icon={Handshake} />
+        <StatCard label={t("dashboard.activeDeals")} value={String(active)} icon={RefreshCcw} />
+        <StatCard label={t("transactions.completedDeals")} value={String(completed)} icon={CheckCircle2} />
       </div>
 
-      <Section title="Deal History">
+      <Section title={t("transactions.history")}>
         <div className="mb-4 flex flex-wrap gap-2">
           {[
-            ["All", deals.length],
-            ["Active", active],
-            ["Completed", completed],
-            ["Rejected", rejected],
-          ].map(([filter, count]) => (
+            ["All", deals.length, t("common.all")],
+            ["Active", active, t("common.active")],
+            ["Completed", completed, t("common.completed")],
+            ["Rejected", rejected, t("common.rejected")],
+          ].map(([filter, count, label]) => (
             <button
               key={filter}
               type="button"
@@ -360,7 +363,7 @@ export function Transactions() {
                   : "border-[#D8CDBB] bg-white text-[#765536] hover:border-[#B96832]/60"
               }`}
             >
-              {filter} ({count})
+              {label} ({count})
             </button>
           ))}
         </div>
@@ -371,27 +374,27 @@ export function Transactions() {
           <div className="grid min-h-[240px] place-items-center rounded-2xl border border-[#D8CDBB] bg-white shadow-soft">
             <div className="flex items-center gap-3 text-[#B96832] font-semibold">
               <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#B96832] border-t-transparent" />
-              Loading deals...
+              {t("transactions.loading")}
             </div>
           </div>
         ) : filteredDeals.length === 0 ? (
           <div className="rounded-2xl border border-[#D8CDBB] bg-white p-8 text-center shadow-soft">
-            <p className="text-sm font-bold text-[#33291F]">No {activeFilter.toLowerCase()} deals found.</p>
-            <p className="mt-1 text-xs text-[#765536]">Deals you start or receive will appear here automatically.</p>
+            <p className="text-sm font-bold text-[#33291F]">{t("transactions.none", { filter: activeFilter === "All" ? t("common.all").toLowerCase() : activeFilter.toLowerCase() })}</p>
+            <p className="mt-1 text-xs text-[#765536]">{t("transactions.noneHint")}</p>
           </div>
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-[#D8CDBB] bg-white shadow-soft">
             <table className="min-w-full text-left text-sm">
               <thead className="bg-[#F4EFE4] font-bold text-[#765536]">
                 <tr>
-                  <th className="p-4">Deal</th>
-                  <th className="p-4">{user?.role === "Buyer" ? "Farmer" : "Buyer"}</th>
-                  <th className="p-4">Produce</th>
-                  <th className="p-4">Quantity</th>
-                  <th className="p-4">Price</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4">Payment</th>
-                  <th className="p-4">Action</th>
+                  <th className="p-4">{t("deal.room")}</th>
+                  <th className="p-4">{user?.role === "Buyer" ? t("common.farmer") : t("common.buyer")}</th>
+                  <th className="p-4">{t("common.produce")}</th>
+                  <th className="p-4">{t("common.quantity")}</th>
+                  <th className="p-4">{t("common.price")}</th>
+                  <th className="p-4">{t("common.status")}</th>
+                  <th className="p-4">{t("common.payment")}</th>
+                  <th className="p-4">{t("common.action")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#D8CDBB]">
@@ -411,7 +414,7 @@ export function Transactions() {
                       <td className="p-4 font-semibold text-[#33291F]">
                         {otherParty}
                         <span className="mt-1 block text-[11px] font-medium text-[#765536]">
-                          {user?.role === "Buyer" ? "Farmer" : "Buyer"}
+                          {user?.role === "Buyer" ? t("common.farmer") : t("common.buyer")}
                         </span>
                       </td>
                       <td className="p-4 text-[#765536]">
@@ -421,25 +424,25 @@ export function Transactions() {
                       <td className="p-4 font-semibold text-[#33291F]">{number(deal.quantityQt)} Qt</td>
                       <td className="p-4 text-[#33291F]">
                         <b className="block">{money(unitPrice)} / Qt</b>
-                        <span className="text-xs text-[#765536]">{money(total)} total</span>
+                        <span className="text-xs text-[#765536]">{money(total)} {t("common.total")}</span>
                       </td>
                       <td className="p-4">
                         <span className={`rounded-lg px-2.5 py-1 text-xs font-bold ${statusClass(deal.status)}`}>
-                          {deal.status.replaceAll("_", " ")}
+                          {statusLabel(deal.status)}
                         </span>
                       </td>
                       <td className="p-4">
                         <span className={`rounded-lg px-2.5 py-1 text-xs font-bold ${paymentClass(deal.paymentStatus)}`}>
-                          {deal.paymentStatus}
+                          {paymentLabel(deal.paymentStatus)}
                         </span>
                       </td>
                       <td className="p-4">
                         <div className="flex flex-wrap gap-2">
                           <Link to={`/deal-room/${deal.id}`} className="inline-flex items-center gap-1 rounded-md bg-[#B96832] px-3 py-2 text-xs font-bold text-white hover:bg-[#9D5529]">
-                            <Handshake size={14} /> Open Deal
+                            <Handshake size={14} /> {t("transactions.openDeal")}
                           </Link>
                           <Link to={`/bill/${deal.id}`} className="inline-flex items-center gap-1 rounded-md border border-[#D8CDBB] px-3 py-2 text-xs font-bold text-[#765536] hover:border-[#B96832]/60">
-                            <FileText size={14} /> Bill
+                            <FileText size={14} /> {t("transactions.bill")}
                           </Link>
                         </div>
                       </td>
@@ -457,6 +460,7 @@ export function Transactions() {
 
 export function Bill() {
   const { id = "DL-9002" } = useParams();
+  const { t, statusLabel, paymentLabel } = useI18n();
   const [deal, setDeal] = useState<Deal | null>(null);
 
   useEffect(() => {
@@ -466,13 +470,13 @@ export function Bill() {
   }, [id]);
 
   if (!deal) {
-    return <div className="py-12 text-center text-xs text-[#765536]">Loading Digital Bill...</div>;
+    return <div className="py-12 text-center text-xs text-[#765536]">{t("bill.loading")}</div>;
   }
 
   const total = deal.agreedPrice * deal.quantityQt;
 
   function downloadBill() {
-    const content = `FAIRTRADE DIGITAL BILL / INVOICE\n-----------------------------------\nBill Reference: ${deal!.id}\nDate: ${deal!.date}\nTransaction Option: ${deal!.transactionMode}\nFarmer (Seller): ${deal!.farmer}\nBuyer: ${deal!.buyer}\nCrop & Lot: ${deal!.crop} (${deal!.lotId})\nQuantity: ${deal!.quantityQt} Quintals\nQuality Grade: ${deal!.grade}\nAgreed Rate: ${deal!.agreedPrice} / Qt\nTotal Transaction Amount: ${total}\nPayment Status: ${deal!.status}\nPayment Given: ${deal!.paymentGiven ? "Confirmed" : "Pending"}\nPayment Received: ${deal!.paymentReceived ? "Confirmed" : "Pending"}\n`;
+    const content = `FAIRTRADE DIGITAL BILL / INVOICE\n-----------------------------------\n${t("bill.reference")}: ${deal!.id}\n${t("common.date")}: ${deal!.date}\n${t("bill.transactionOption")}: ${deal!.transactionMode}\n${t("bill.farmerSeller")}: ${deal!.farmer}\n${t("common.buyer")}: ${deal!.buyer}\n${t("bill.cropLot")}: ${deal!.crop} (${deal!.lotId})\n${t("common.quantity")}: ${deal!.quantityQt} ${t("common.quintal")}\n${t("deal.qualityGrade")}: ${deal!.grade}\n${t("deal.agreedRate")}: ${deal!.agreedPrice} / Qt\n${t("common.totalAmount")}: ${total}\n${t("deal.paymentStatus")}: ${statusLabel(deal!.status)}\n${t("bill.paymentGivenStatus")}: ${deal!.paymentGiven ? t("common.confirmed") : t("common.pending")}\n${t("bill.paymentReceivedStatus")}: ${deal!.paymentReceived ? t("common.confirmed") : t("common.pending")}\n`;
     const blob = new Blob([content], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -492,13 +496,13 @@ export function Bill() {
             onClick={() => window.print()}
             className="inline-flex items-center gap-2 rounded-xl border border-[#555633] px-4 py-2.5 text-xs font-bold text-[#555633] hover:bg-[#E9E1D2]"
           >
-            <Printer size={16} /> Print Invoice
+            <Printer size={16} /> {t("bill.printInvoice")}
           </button>
           <button
             onClick={downloadBill}
             className="inline-flex items-center gap-2 rounded-xl bg-[#B96832] px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#9D5529]"
           >
-            <Download size={16} /> Download Bill TXT
+            <Download size={16} /> {t("bill.downloadTxt")}
           </button>
         </div>
       </div>
@@ -507,34 +511,34 @@ export function Bill() {
       <div>
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-xs font-bold text-[#33291F] uppercase tracking-wider">Digital Bill / Transaction Record</p>
-            <h1 className="text-3xl font-black text-[#33291F] mt-1">Invoice #{deal.id}</h1>
+            <p className="text-xs font-bold text-[#33291F] uppercase tracking-wider">{t("bill.record")}</p>
+            <h1 className="text-3xl font-black text-[#33291F] mt-1">{t("bill.invoice", { id: deal.id })}</h1>
             <p className="text-xs text-[#765536] mt-1">
-              Issued: {deal.date} | Mode: <b>{deal.transactionMode}</b>
+              {t("bill.issued")}: {deal.date} | {t("bill.mode")}: <b>{deal.transactionMode}</b>
             </p>
           </div>
           <span className={`rounded-xl px-4 py-2 text-xs font-black ${statusClass(deal.status)}`}>
-            {deal.status.replaceAll("_", " ")}
+            {statusLabel(deal.status)}
           </span>
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <BillRow label="Seller (Farmer)" value={deal.farmer} />
-          <BillRow label="Buyer" value={deal.buyer} />
-          <BillRow label="Crop & Lot ID" value={`${deal.crop} - ${deal.lotId}`} />
-          <BillRow label="Quality Grade" value={deal.grade} />
-          <BillRow label="Quantity" value={`${number(deal.quantityQt)} Quintal`} />
-          <BillRow label="Agreed Rate" value={`${money(deal.agreedPrice)} / Quintal`} />
+          <BillRow label={t("bill.sellerFarmer")} value={deal.farmer} />
+          <BillRow label={t("common.buyer")} value={deal.buyer} />
+          <BillRow label={t("deal.cropAndLot")} value={`${deal.crop} - ${deal.lotId}`} />
+          <BillRow label={t("deal.qualityGrade")} value={deal.grade} />
+          <BillRow label={t("common.quantity")} value={`${number(deal.quantityQt)} ${t("common.quintal")}`} />
+          <BillRow label={t("deal.agreedRate")} value={`${money(deal.agreedPrice)} / ${t("common.quintal")}`} />
 
           {deal.transactionMode === "Use FairTrade" && (
             <>
-              <BillRow label="Payment Given Status" value={deal.paymentGiven ? "Confirmed" : "Pending"} />
-              <BillRow label="Payment Received Status" value={deal.paymentReceived ? "Confirmed" : "Pending"} />
+              <BillRow label={t("bill.paymentGivenStatus")} value={deal.paymentGiven ? t("common.confirmed") : paymentLabel("PENDING")} />
+              <BillRow label={t("bill.paymentReceivedStatus")} value={deal.paymentReceived ? t("common.confirmed") : paymentLabel("PENDING")} />
             </>
           )}
 
           <div className="md:col-span-2">
-            <BillRow label="Total Transaction Amount" value={money(total)} strong />
+            <BillRow label={t("common.totalAmount")} value={money(total)} strong />
           </div>
         </div>
       </div>

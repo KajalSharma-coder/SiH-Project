@@ -198,12 +198,38 @@ export async function initDb() {
     );
   }
 
-  // Seed market quotes if table is empty
-  const quoteCount = await get("SELECT COUNT(*) as count FROM market_quotes");
-  if (Number(quoteCount.count) === 0) {
+  // Seed any missing market quotes while preserving existing rows.
+  {
+    const jaipurMandis = [
+      "Chandpole Mandi",
+      "Sanganer Mandi",
+      "Chomu (Grain)",
+      "Jaipur (Grain)",
+      "Jaipur(Grain)(Chandpole)",
+      "Kishan Renwal(Fulera)",
+      "Kishangarh Renwal",
+      "Kotputli",
+      "Sambhar (Kishangarh renwal)",
+      "Bagru",
+      "Chaksu",
+      "Bassi",
+      "Kotputli(Pawla)",
+      "Chomu (F&V)",
+      "Jaipur(Grain)(Sodala)",
+      "Dudu APMC",
+      "Bassi APMC",
+      "Chomu Grain APMC",
+      "Chaksu APMC",
+      "Kishangarh Renwal APMC",
+      "Bagru APMC",
+      "Rajdhanai Mandi (KukarKheda)",
+      "Rajdhanai Mandi (KukarKheda) APMC",
+      "Rajdhanai Mandi KukarKheda APMC",
+      "Jaipur (Grain) APMC",
+    ];
     const locations = [
       { state: "Rajasthan", city: "Kota", mandis: ["Ramganj Mandi", "Kota Krishi Upaj Mandi"] },
-      { state: "Rajasthan", city: "Jaipur", mandis: ["Chandpole Mandi", "Sanganer Mandi"] },
+      { state: "Rajasthan", city: "Jaipur", mandis: jaipurMandis },
       { state: "Rajasthan", city: "Bundi", mandis: ["Bundi Mandi", "Keshoraipatan Mandi"] },
       { state: "Rajasthan", city: "Alwar", mandis: ["Alwar Mandi", "Khairthal Mandi"] },
       { state: "Rajasthan", city: "Ajmer", mandis: ["Ajmer Mandi", "Kishangarh Mandi"] },
@@ -249,7 +275,7 @@ export async function initDb() {
             const forecastObj = forecast(currentPrice, spread);
 
             await run(
-              `INSERT INTO market_quotes (id, state, city, mandi, crop, grade, current_price, change_val, high, low, updated_at, confidence, forecast_json) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+              `INSERT INTO market_quotes (id, state, city, mandi, crop, grade, current_price, change_val, high, low, updated_at, confidence, forecast_json) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) ON CONFLICT (id) DO NOTHING`,
               [
                 id,
                 loc.state,

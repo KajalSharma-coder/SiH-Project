@@ -1,25 +1,27 @@
-import { BarChart3, FileText, LayoutDashboard, LogOut, Menu, PackageCheck, Store, X } from "lucide-react";
+import { BarChart3, FileText, Globe2, LayoutDashboard, LogOut, Menu, PackageCheck, Store, X } from "lucide-react";
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useI18n, type Language } from "../context/I18nContext";
 import { FairTradeLogo } from "./Logo";
 
 type NavItem = readonly [string, string, typeof Store];
 
 const sharedItems: NavItem[] = [
-  ["Marketplace", "/marketplace", Store],
-  ["Price Prediction", "/price-prediction", BarChart3],
-  ["Daily Price Tracking", "/daily-prices", PackageCheck],
-  ["Deal Room", "/deal-room", FileText],
+  ["nav.marketplace", "/marketplace", Store],
+  ["nav.pricePrediction", "/price-prediction", BarChart3],
+  ["nav.dailyPrices", "/daily-prices", PackageCheck],
+  ["nav.dealRoom", "/deal-room", FileText],
 ] as const satisfies NavItem[];
 
 export function AppShell() {
   const [open, setOpen] = useState(false);
   const { user, logout } = useAuth();
+  const { language, setLanguage, t, roleLabel } = useI18n();
   const navigate = useNavigate();
 
   const dashboardHref = user?.role === "Buyer" ? "/buyer/dashboard" : "/farmer/dashboard";
-  const navItems: NavItem[] = [["Dashboard", dashboardHref, LayoutDashboard], ...sharedItems];
+  const navItems: NavItem[] = [["nav.dashboard", dashboardHref, LayoutDashboard], ...sharedItems];
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-semibold transition ${
@@ -64,22 +66,36 @@ export function AppShell() {
               {navItems.map(([label, href, Icon]) => (
                 <NavLink key={href} to={href} end={href === "/"} className={linkClass} onClick={() => setOpen(false)}>
                   <Icon size={17} />
-                  {label}
+                  {t(label)}
                 </NavLink>
               ))}
             </nav>
 
             <div className="mt-auto space-y-3">
+              <label className="block rounded-md border border-[#E9E1D2]/15 bg-white/10 p-3 text-[#F4EFE4]">
+                <span className="mb-2 flex items-center gap-2 text-xs font-bold text-[#E9E1D2]">
+                  <Globe2 size={15} />
+                  {t("language.label")}
+                </span>
+                <select
+                  value={language}
+                  onChange={(event) => setLanguage(event.target.value as Language)}
+                  className="w-full rounded-md border border-[#E9E1D2]/25 bg-[#4A4B2D] px-3 py-2 text-sm font-bold text-[#F4EFE4] outline-none focus:border-[#E1B083]"
+                >
+                  <option value="en">{t("language.english")}</option>
+                  <option value="hi">{t("language.hindi")}</option>
+                </select>
+              </label>
               <div className="rounded-md border border-[#E9E1D2]/15 bg-white/10 p-3 text-[#F4EFE4]">
                 <p className="text-sm font-bold">{user?.name}</p>
-                <p className="text-xs text-[#E9E1D2]/80">{user?.role}</p>
+                <p className="text-xs text-[#E9E1D2]/80">{roleLabel(user?.role)}</p>
               </div>
               <button
                 onClick={handleLogout}
                 className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-semibold text-[#E9E1D2] hover:bg-white/10 hover:text-white"
               >
                 <LogOut size={17} />
-                Logout
+                {t("nav.logout")}
               </button>
             </div>
           </div>

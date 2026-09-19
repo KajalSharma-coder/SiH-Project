@@ -4,6 +4,7 @@ import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom"
 import { AppShell } from "./components/AppShell";
 import { PublicShell } from "./components/PublicShell";
 import { AuthProvider, ProtectedRoute } from "./context/AuthContext";
+import { I18nProvider } from "./context/I18nContext";
 import "./index.css";
 import { BuyerDashboard, BuyerDemand, BuyerMatches } from "./pages/Buyer";
 import { CreateLot, FarmerDashboard, FarmerMatches, QualityPassport } from "./pages/Farmer";
@@ -105,8 +106,10 @@ const router = createBrowserRouter([
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <AuthProvider>
-      <RouterProvider router={router} />
-    </AuthProvider>
+    <I18nProvider>
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
+    </I18nProvider>
   </React.StrictMode>
 );

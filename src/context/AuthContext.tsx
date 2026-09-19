@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { getCurrentUser, loginUser, registerUser } from "../services/api";
 import { Navigate, useLocation } from "react-router-dom";
+import { useI18n } from "./I18nContext";
 
 export type AuthUser = {
   id: string;
@@ -82,6 +83,7 @@ export function useAuth() {
 
 export function ProtectedRoute({ children, roleRequired }: { children: React.ReactNode; roleRequired?: "Farmer" | "Buyer" }) {
   const { user, loading } = useAuth();
+  const { t } = useI18n();
   const location = useLocation();
 
   if (loading) {
@@ -89,7 +91,7 @@ export function ProtectedRoute({ children, roleRequired }: { children: React.Rea
       <div className="grid min-h-[400px] place-items-center">
         <div className="flex items-center gap-3 text-[#B96832] font-semibold">
           <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#B96832] border-t-transparent" />
-          Checking authentication...
+          {t("auth.checking")}
         </div>
       </div>
     );

@@ -3,6 +3,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Section, StatCard } from "../components/Cards";
 import { useAuth } from "../context/AuthContext";
+import { useI18n } from "../context/I18nContext";
 import { createDemand, getDeals, getDemands, getLots, scoreMatches, startDeal } from "../services/api";
 import type { Crop, Deal, Demand, Grade, Lot } from "../types";
 import { money } from "../utils/format";
@@ -12,6 +13,7 @@ const inputClass = "w-full rounded-md border border-[#D8CDBB] bg-white px-3.5 py
 
 export function BuyerDashboard() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [demands, setDemands] = useState<Demand[]>([]);
   const [lots, setLots] = useState<Lot[]>([]);
   const [deals, setDeals] = useState<Deal[]>([]);
@@ -28,7 +30,7 @@ export function BuyerDashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <Loading text="Loading buyer dashboard..." />;
+  if (loading) return <Loading text={t("common.loading")} />;
 
   const myDemands = user ? demands.filter((demand) => demand.buyerId === user.id || demand.buyerName === user.name) : demands;
   const shownDemands = myDemands.length ? myDemands : demands;
@@ -39,38 +41,38 @@ export function BuyerDashboard() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title={`Hello, ${user?.name || "Buyer"}`} subtitle="Your requirements, matching produce and deals." />
+      <PageHeader title={t("dashboard.hello", { name: user?.name || t("role.Buyer") })} subtitle={t("dashboard.buyerSubtitle")} />
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="My Requirements" value={String(shownDemands.length)} helper="Open needs" icon={ShoppingBasket} />
-        <StatCard label="Matching Produce" value={String(matches.length)} helper="For latest requirement" icon={PackageSearch} />
-        <StatCard label="Active Deals" value={String(activeDeals.length)} helper="In progress" icon={HandCoins} />
-        <StatCard label="Reliability Score" value="Verified" helper="Buyer profile" icon={ShieldCheck} />
+        <StatCard label={t("dashboard.myRequirements")} value={String(shownDemands.length)} helper={t("dashboard.openNeeds")} icon={ShoppingBasket} />
+        <StatCard label={t("dashboard.matchingProduce")} value={String(matches.length)} helper={t("dashboard.forLatestRequirement")} icon={PackageSearch} />
+        <StatCard label={t("dashboard.activeDeals")} value={String(activeDeals.length)} helper={t("dashboard.inProgress")} icon={HandCoins} />
+        <StatCard label={t("dashboard.reliabilityScore")} value={t("dashboard.verified")} helper={t("dashboard.buyerProfile")} icon={ShieldCheck} />
       </div>
 
       <section className="rounded-md border border-[#D8CDBB] bg-[#E9E1D2] p-4">
-        <h2 className="font-black">Quick Actions</h2>
+        <h2 className="font-black">{t("dashboard.quickActions")}</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <QuickAction to="/buyer/demand" icon={Plus} label="Add Requirement" />
-          <QuickAction to="/marketplace" icon={Store} label="Marketplace" />
-          <QuickAction to="/price-prediction" icon={TrendingUp} label="Check Prices" />
-          <QuickAction to="/deal-room" icon={FileText} label="Deal Room" />
+          <QuickAction to="/buyer/demand" icon={Plus} label={t("dashboard.addRequirement")} />
+          <QuickAction to="/marketplace" icon={Store} label={t("nav.marketplace")} />
+          <QuickAction to="/price-prediction" icon={TrendingUp} label={t("dashboard.checkPrices")} />
+          <QuickAction to="/deal-room" icon={FileText} label={t("nav.dealRoom")} />
         </div>
       </section>
 
-      <Section title="Recent Requirements">
+      <Section title={t("dashboard.recentRequirements")}>
         <div className="overflow-x-auto rounded-md border border-[#D8CDBB] bg-white">
           {shownDemands.length === 0 ? (
-            <EmptyState text="No buyer requirements found." />
+            <EmptyState text={t("dashboard.noBuyerRequirements")} />
           ) : (
             <table className="min-w-full text-left text-sm">
               <thead className="bg-[#F4EFE4] text-[#765536]">
                 <tr>
-                  <th className="p-4">Crop</th>
-                  <th className="p-4">Quantity</th>
-                  <th className="p-4">Grade</th>
-                  <th className="p-4">Mandi</th>
-                  <th className="p-4">Price Range</th>
+                  <th className="p-4">{t("common.crop")}</th>
+                  <th className="p-4">{t("common.quantity")}</th>
+                  <th className="p-4">{t("common.grade")}</th>
+                  <th className="p-4">{t("common.mandi")}</th>
+                  <th className="p-4">{t("forms.priceRange")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#D8CDBB]">
@@ -89,7 +91,7 @@ export function BuyerDashboard() {
         </div>
       </Section>
 
-      <Section title="My Deals" subtitle="Active negotiations, payment pending and completed trade rooms.">
+      <Section title={t("dashboard.myDeals")} subtitle={t("dashboard.myDealsSubtitle")}>
         <DealList deals={myDeals} />
       </Section>
 
@@ -109,6 +111,7 @@ function QuickAction({ to, icon: Icon, label }: { to: string; icon: typeof Plus;
 
 export function BuyerDemand() {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -129,7 +132,7 @@ export function BuyerDemand() {
       });
       navigate("/buyer/dashboard");
     } catch (err: any) {
-      setError(err.message || "Failed to create requirement.");
+      setError(err.message || t("forms.failedRequirement"));
     } finally {
       setSubmitting(false);
     }
@@ -137,24 +140,24 @@ export function BuyerDemand() {
 
   return (
     <div className="mx-auto max-w-3xl rounded-md border border-[#D8CDBB] bg-white p-5">
-      <PageHeader title="Add Requirement" subtitle="Save crop demand, quantity, grade and price range to the backend." />
+      <PageHeader title={t("forms.addRequirementTitle")} subtitle={t("forms.addRequirementSubtitle")} />
       {error && <div className="mt-5 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
       <form onSubmit={submit} className="mt-5 grid gap-4 md:grid-cols-2">
-        <Select name="crop" label="Crop" options={["Wheat", "Rice", "Mustard", "Maize", "Gram"]} />
-        <Select name="grade" label="Grade" options={["FAQ", "A", "Premium", "Lab Verified", "Organic"]} />
-        <Field name="quantityQt" label="Quantity (quintals)" type="number" />
+        <Select name="crop" label={t("common.crop")} options={["Wheat", "Rice", "Mustard", "Maize", "Gram"]} />
+        <Select name="grade" label={t("common.grade")} options={["FAQ", "A", "Premium", "Lab Verified", "Organic"]} />
+        <Field name="quantityQt" label={t("forms.quantityQuintals")} type="number" />
         <div>
-          <span className="mb-1 block text-xs font-bold text-[#765536]">Price range (Rs/qt)</span>
+          <span className="mb-1 block text-xs font-bold text-[#765536]">{t("forms.priceRange")}</span>
           <div className="grid grid-cols-2 gap-2">
-            <input name="minPrice" required type="number" className={inputClass} placeholder="Min" />
-            <input name="maxPrice" required type="number" className={inputClass} placeholder="Max" />
+            <input name="minPrice" required type="number" className={inputClass} placeholder={t("forms.min")} />
+            <input name="maxPrice" required type="number" className={inputClass} placeholder={t("forms.max")} />
           </div>
         </div>
-        <Field name="city" label="City" defaultValue="Kota" />
-        <Field name="mandi" label="Mandi" defaultValue="Ramganj Mandi" />
+        <Field name="city" label={t("common.city")} defaultValue="Kota" />
+        <Field name="mandi" label={t("common.mandi")} defaultValue="Ramganj Mandi" />
         <div className="md:col-span-2 flex justify-end gap-3">
-          <Link to="/buyer/dashboard" className="rounded-md border border-[#555633] px-5 py-3 text-sm font-bold text-[#555633]">Cancel</Link>
-          <button disabled={submitting} className="rounded-md bg-[#555633] px-5 py-3 text-sm font-bold text-[#F4EFE4]">{submitting ? "Saving..." : "Save Requirement"}</button>
+          <Link to="/buyer/dashboard" className="rounded-md border border-[#555633] px-5 py-3 text-sm font-bold text-[#555633]">{t("common.cancel")}</Link>
+          <button disabled={submitting} className="rounded-md bg-[#555633] px-5 py-3 text-sm font-bold text-[#F4EFE4]">{submitting ? t("common.saving") : t("forms.saveRequirement")}</button>
         </div>
       </form>
     </div>
@@ -175,6 +178,7 @@ export function BuyerMatches() {
 
 function MatchesSection({ demand, lots }: { demand?: Demand; lots: Lot[] }) {
   const { user } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [startingLot, setStartingLot] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -191,22 +195,22 @@ function MatchesSection({ demand, lots }: { demand?: Demand; lots: Lot[] }) {
         lotId: lot.id,
         quantity: Math.min(activeDemand.quantityQt, lot.quantityQt),
         pricePerUnit: lot.expectedPrice,
-        message: `Initial offer for ${Math.min(activeDemand.quantityQt, lot.quantityQt)} qt of ${lot.crop}.`,
+        message: t("market.initialOffer", { quantity: Math.min(activeDemand.quantityQt, lot.quantityQt), crop: lot.crop }),
       });
       navigate(`/deal-room/${deal.id}`);
     } catch (err: any) {
-      setError(err.message || "Failed to start deal.");
+      setError(err.message || t("market.failedStartDeal"));
     } finally {
       setStartingLot(null);
     }
   }
 
   return (
-    <Section title="Matching Produce">
+    <Section title={t("dashboard.matchingProduce")}>
       {error && <div className="mb-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
       <div className="grid gap-3 md:grid-cols-2">
         {matches.length === 0 ? (
-          <EmptyState text="No matching produce found for the selected requirement." />
+          <EmptyState text={t("market.noLots")} />
         ) : (
           matches.slice(0, 4).map((match) => (
             <article key={match.lot.id} className="rounded-md border border-[#D8CDBB] bg-white p-4">
@@ -224,7 +228,7 @@ function MatchesSection({ demand, lots }: { demand?: Demand; lots: Lot[] }) {
                 onClick={() => handleStartDeal(match.lot)}
                 className="mt-4 inline-flex rounded-md bg-[#B96832] px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {startingLot === match.lot.id ? "Opening..." : "Start Deal"}
+                {startingLot === match.lot.id ? t("common.opening") : t("market.startDeal")}
               </button>
             </article>
           ))
@@ -235,19 +239,20 @@ function MatchesSection({ demand, lots }: { demand?: Demand; lots: Lot[] }) {
 }
 
 function DealList({ deals }: { deals: Deal[] }) {
-  if (deals.length === 0) return <EmptyState text="No deals yet. Start from a matching produce lot." />;
+  const { t, statusLabel, paymentLabel } = useI18n();
+  if (deals.length === 0) return <EmptyState text={t("dashboard.noDealsYet")} />;
 
   return (
     <div className="overflow-x-auto rounded-md border border-[#D8CDBB] bg-white">
       <table className="min-w-full text-left text-sm">
         <thead className="bg-[#F4EFE4] text-[#765536]">
           <tr>
-            <th className="p-4">Deal</th>
-            <th className="p-4">Farmer / Produce</th>
-            <th className="p-4">Quantity</th>
-            <th className="p-4">Status</th>
-            <th className="p-4">Payment</th>
-            <th className="p-4">Action</th>
+            <th className="p-4">{t("transactions.bill")}</th>
+            <th className="p-4">{t("dashboard.farmerProduce")}</th>
+            <th className="p-4">{t("common.quantity")}</th>
+            <th className="p-4">{t("common.status")}</th>
+            <th className="p-4">{t("common.payment")}</th>
+            <th className="p-4">{t("common.action")}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-[#D8CDBB]">
@@ -256,9 +261,9 @@ function DealList({ deals }: { deals: Deal[] }) {
               <td className="p-4 font-black text-[#33291F]">{deal.id}</td>
               <td className="p-4">{deal.farmer}<span className="block text-xs text-[#765536]">{deal.crop} - {deal.lotId}</span></td>
               <td className="p-4">{deal.quantityQt} qt</td>
-              <td className="p-4"><StatusPill value={deal.status} /></td>
-              <td className="p-4">{deal.paymentStatus}</td>
-              <td className="p-4"><Link to={`/deal-room/${deal.id}`} className="text-xs font-bold text-[#B96832] hover:underline">Open Deal Room</Link></td>
+              <td className="p-4"><StatusPill value={statusLabel(deal.status)} /></td>
+              <td className="p-4">{paymentLabel(deal.paymentStatus)}</td>
+              <td className="p-4"><Link to={`/deal-room/${deal.id}`} className="text-xs font-bold text-[#B96832] hover:underline">{t("transactions.openDeal")}</Link></td>
             </tr>
           ))}
         </tbody>
