@@ -4,7 +4,10 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
+    "dev": "node scripts/dev.js",
+    "dev:frontend": "vite --host 0.0.0.0",
+    "dev:backend": "npm --prefix server run dev",
+    "start:backend": "npm --prefix server start",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "typecheck": "tsc -b"

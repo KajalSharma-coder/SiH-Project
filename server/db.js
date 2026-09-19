@@ -1,29 +1,63 @@
-import "dotenv/config";
 import bcrypt from "bcryptjs";
+import dotenv from "dotenv";
 import pg from "pg";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const { Pool } = pg;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL is required to connect to PostgreSQL.");
+dotenv.config({ path: path.join(__dirname, ".env") });
+dotenv.config();
+
+let pool;
+let databaseStatus = {
+  connected: false,
+  error: null,
+};
+
+function getErrorMessage(error) {
+  if (error?.message) return error.message;
+  if (Array.isArray(error?.errors) && error.errors.length > 0) {
+    return error.errors.map((item) => item.message || String(item)).join("; ");
+  }
+  return String(error);
 }
 
-export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL.includes("sslmode=require")
-    ? { rejectUnauthorized: false }
-    : undefined,
-});
+function getPool() {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is required to connect to PostgreSQL.");
+  }
 
-pool.on("error", (error) => {
-  console.error("Unexpected PostgreSQL pool error:", error);
-});
+  if (!pool) {
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      connectionTimeoutMillis: Number(process.env.DB_CONNECT_TIMEOUT_MS) || 5000,
+      ssl: process.env.DATABASE_URL.includes("sslmode=require")
+        ? { rejectUnauthorized: false }
+        : undefined,
+    });
+
+    pool.on("error", (error) => {
+      databaseStatus = { connected: false, error: getErrorMessage(error) };
+      console.error("Unexpected PostgreSQL pool error:", error);
+    });
+  }
+
+  return pool;
+}
+
+export function getDatabaseStatus() {
+  return databaseStatus;
+}
 
 export async function testDatabaseConnection() {
   try {
-    await pool.query("SELECT 1");
+    await getPool().query("SELECT 1");
+    databaseStatus = { connected: true, error: null };
     console.log("PostgreSQL connected successfully");
   } catch (error) {
+    databaseStatus = { connected: false, error: getErrorMessage(error) };
     console.error("PostgreSQL connection error:", error);
     throw error;
   }
@@ -31,8 +65,9 @@ export async function testDatabaseConnection() {
 
 async function query(sql, params = []) {
   try {
-    return await pool.query(sql, params);
+    return await getPool().query(sql, params);
   } catch (error) {
+    databaseStatus = { connected: false, error: getErrorMessage(error) };
     console.error("PostgreSQL query error:", {
       message: error.message,
       code: error.code,
@@ -63,7 +98,12 @@ export async function all(sql, params = []) {
 
 // Seed & Database initialization
 export async function initDb() {
-  await testDatabaseConnection();
+  try {
+    await testDatabaseConnection();
+  } catch (error) {
+    console.error("Database initialization skipped. Server will keep running, but data routes will return errors until the database is reachable.");
+    return false;
+  }
 
   await run(`
     CREATE TABLE IF NOT EXISTS users (
@@ -378,4 +418,6 @@ export async function initDb() {
       ["MSG-2", "DL-9001", "Kisan Retail Chain", "Agreed at Rs 5,860/Qt. Please share payment confirmation after weighing.", "10:22 AM"]
     );
   }
+  databaseStatus = { connected: true, error: null };
+  return true;
 }

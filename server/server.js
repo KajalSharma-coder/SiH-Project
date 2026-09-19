@@ -2,17 +2,40 @@ import express from "express";
 import cors from "cors";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import { initDb, run, get, all } from "./db.js";
+import { initDb, run, get, all, getDatabaseStatus } from "./db.js";
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = Number(process.env.PORT) || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || "fairtrade_sih_secret_key_2026";
+const FRONTEND_ORIGINS = (process.env.FRONTEND_ORIGIN || "http://localhost:5173,http://127.0.0.1:5173")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const LOCAL_DEV_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/;
 
-app.use(cors());
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || FRONTEND_ORIGINS.includes(origin) || LOCAL_DEV_ORIGIN.test(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error(`CORS blocked origin: ${origin}`));
+  },
+  credentials: true,
+}));
 app.use(express.json());
 
 // Initialize database
 await initDb();
+
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", database: getDatabaseStatus() });
+});
 
 // Helper Auth Middleware
 function authenticateToken(req, res, next) {
@@ -636,6 +659,16 @@ app.post("/api/quality/samples", authenticateToken, async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`FairTrade Backend API server running on port ${PORT}`);
+});
+
+server.on("error", (error) => {
+  if (error.code === "EADDRINUSE") {
+    console.error(`Port ${PORT} is already in use. Stop the existing process or set PORT to a different value.`);
+    process.exit(1);
+  }
+
+  console.error("Backend server failed to start:", error);
+  process.exit(1);
 });
