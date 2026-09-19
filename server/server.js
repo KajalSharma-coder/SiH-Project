@@ -218,147 +218,406 @@ app.post("/api/demands", authenticateToken, async (req, res) => {
   }
 });
 
+const DEAL_STATUSES = new Set(["NEGOTIATING", "COUNTER_OFFER", "AGREED", "PAYMENT_PENDING", "PAYMENT_SENT", "COMPLETED", "REJECTED", "CANCELLED"]);
+const FINAL_STATUSES = new Set(["COMPLETED", "REJECTED", "CANCELLED"]);
+
+function normalizeDealStatus(status) {
+  const value = String(status || "NEGOTIATING").trim().toUpperCase().replace(/\s+/g, "_");
+  if (value === "OFFER_SENT") return "NEGOTIATING";
+  if (value === "PAYMENT_PENDING") return "PAYMENT_PENDING";
+  if (DEAL_STATUSES.has(value)) return value;
+  return "NEGOTIATING";
+}
+
+function derivePaymentStatus(row) {
+  if (row.payment_status) return row.payment_status;
+  if (row.payment_received) return "RECEIVED";
+  if (row.payment_given) return "SENT";
+  return "PENDING";
+}
+
+function formatDeal(row) {
+  const status = normalizeDealStatus(row.status);
+  const paymentStatus = derivePaymentStatus(row);
+  return {
+    id: row.id,
+    farmer: row.farmer,
+    buyer: row.buyer,
+    farmerId: row.farmer_id,
+    buyerId: row.buyer_id,
+    lotId: row.lot_id,
+    crop: row.crop,
+    quantityQt: Number(row.quantity_qt),
+    grade: row.grade,
+    agreedPrice: Number(row.agreed_price || 0),
+    offer: Number(row.offer || 0),
+    counterOffer: Number(row.counter_offer || 0),
+    paymentGiven: Boolean(row.payment_given),
+    paymentReceived: Boolean(row.payment_received),
+    paymentStatus,
+    transactionMode: row.transaction_mode,
+    status,
+    date: row.date,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function formatOffer(row) {
+  return {
+    id: row.id,
+    dealId: row.deal_id,
+    senderId: row.sender_id,
+    senderRole: row.sender_role,
+    quantity: Number(row.quantity),
+    pricePerUnit: Number(row.price_per_unit),
+    totalAmount: Number(row.total_amount),
+    message: row.message || "",
+    status: row.status,
+    createdAt: row.created_at,
+  };
+}
+
+function formatMessage(row) {
+  return {
+    id: row.id,
+    dealId: row.deal_id,
+    senderId: row.sender_id,
+    sender: row.sender,
+    text: row.message || row.text,
+    time: row.time,
+    createdAt: row.created_at,
+  };
+}
+
+function isParticipant(deal, user) {
+  return deal && (deal.buyer_id === user.id || deal.farmer_id === user.id);
+}
+
+async function getDealForUser(dealId, user) {
+  const deal = await get("SELECT * FROM deals WHERE id = $1", [dealId]);
+  if (!deal) {
+    const error = new Error("Deal not found");
+    error.status = 404;
+    throw error;
+  }
+  if (!isParticipant(deal, user)) {
+    const error = new Error("You are not allowed to access this deal");
+    error.status = 403;
+    throw error;
+  }
+  return deal;
+}
+
+function assertMutable(deal) {
+  if (FINAL_STATUSES.has(normalizeDealStatus(deal.status))) {
+    const error = new Error("Completed, rejected or cancelled deals cannot be modified");
+    error.status = 409;
+    throw error;
+  }
+}
+
+function validatePositiveNumber(value, label) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    const error = new Error(`${label} must be greater than 0`);
+    error.status = 400;
+    throw error;
+  }
+  return parsed;
+}
+
+async function latestOffer(dealId) {
+  return get("SELECT * FROM deal_offers WHERE deal_id = $1 ORDER BY created_at DESC LIMIT 1", [dealId]);
+}
+
+async function insertOffer({ deal, user, quantity, pricePerUnit, message, status = "PENDING" }) {
+  const qty = validatePositiveNumber(quantity, "Quantity");
+  const price = validatePositiveNumber(pricePerUnit, "Price per unit");
+  const offerId = `OFF-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+  const totalAmount = qty * price;
+
+  await run(
+    `INSERT INTO deal_offers (id, deal_id, sender_id, sender_role, quantity, price_per_unit, total_amount, message, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [offerId, deal.id, user.id, user.role, qty, price, totalAmount, message || "", status]
+  );
+
+  await run(
+    `UPDATE deals
+     SET quantity_qt = $1,
+         offer = CASE WHEN $2 = 'Buyer' THEN $3 ELSE offer END,
+         counter_offer = CASE WHEN $2 = 'Farmer' THEN $3 ELSE counter_offer END,
+         agreed_price = $3,
+         status = $4,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $5`,
+    [qty, user.role, price, user.role === "Buyer" ? "NEGOTIATING" : "COUNTER_OFFER", deal.id]
+  );
+
+  const created = await get("SELECT * FROM deal_offers WHERE id = $1", [offerId]);
+  return formatOffer(created);
+}
+
+async function acceptLatestOffer(deal, user) {
+  const offer = await latestOffer(deal.id);
+  if (!offer) {
+    const error = new Error("No offer exists for this deal");
+    error.status = 400;
+    throw error;
+  }
+  if (offer.deal_id !== deal.id) {
+    const error = new Error("Offer does not belong to this deal");
+    error.status = 400;
+    throw error;
+  }
+  if (offer.sender_id === user.id) {
+    const error = new Error("You cannot accept your own offer");
+    error.status = 403;
+    throw error;
+  }
+
+  await run("UPDATE deal_offers SET status = $1 WHERE id = $2", ["ACCEPTED", offer.id]);
+  await run(
+    `UPDATE deals
+     SET quantity_qt = $1,
+         agreed_price = $2,
+         status = $3,
+         payment_status = $4,
+         payment_given = 0,
+         payment_received = 0,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $5`,
+    [offer.quantity, offer.price_per_unit, "AGREED", "PENDING", deal.id]
+  );
+}
+
 // Deals / Deal Room
-app.get("/api/deals", async (req, res) => {
+app.post("/api/deals", authenticateToken, async (req, res) => {
   try {
-    const rows = await all("SELECT * FROM deals ORDER BY created_at DESC");
-    const formatted = rows.map((r) => ({
-      id: r.id,
-      farmer: r.farmer,
-      buyer: r.buyer,
-      farmerId: r.farmer_id,
-      buyerId: r.buyer_id,
-      lotId: r.lot_id,
-      crop: r.crop,
-      quantityQt: r.quantity_qt,
-      grade: r.grade,
-      agreedPrice: r.agreed_price,
-      offer: r.offer,
-      counterOffer: r.counter_offer,
-      paymentGiven: Boolean(r.payment_given),
-      paymentReceived: Boolean(r.payment_received),
-      transactionMode: r.transaction_mode,
-      status: r.status,
-      date: r.date,
-    }));
-    res.json(formatted);
+    if (req.user.role !== "Buyer") {
+      return res.status(403).json({ error: "Only buyers can start a deal" });
+    }
+
+    const { lotId, quantity, pricePerUnit, message } = req.body;
+    if (!lotId) return res.status(400).json({ error: "lotId is required" });
+
+    const lot = await get("SELECT * FROM lots WHERE id = $1", [lotId]);
+    if (!lot) return res.status(404).json({ error: "Lot not found" });
+    if (lot.farmer_id === req.user.id) return res.status(400).json({ error: "Buyer cannot start a deal on their own lot" });
+
+    const qty = validatePositiveNumber(quantity || lot.quantity_qt, "Quantity");
+    const price = validatePositiveNumber(pricePerUnit || lot.expected_price, "Price per unit");
+    const id = `DL-${Date.now()}`;
+    const today = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+
+    await run(
+      `INSERT INTO deals (id, farmer, buyer, farmer_id, buyer_id, lot_id, crop, quantity_qt, grade, agreed_price, offer, counter_offer, payment_given, payment_received, transaction_mode, status, payment_status, date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10, $10, 0, 0, $11, $12, $13, $14)`,
+      [id, lot.farmer_name, req.user.name, lot.farmer_id, req.user.id, lot.id, lot.crop, qty, lot.grade, price, "Use FairTrade", "NEGOTIATING", "PENDING", today]
+    );
+
+    const deal = await get("SELECT * FROM deals WHERE id = $1", [id]);
+    await insertOffer({ deal, user: req.user, quantity: qty, pricePerUnit: price, message: message || "Initial offer" });
+    await run("UPDATE lots SET status = $1 WHERE id = $2", ["In Deal", lot.id]);
+
+    const created = await get("SELECT * FROM deals WHERE id = $1", [id]);
+    res.status(201).json(formatDeal(created));
+  } catch (err) {
+    console.error("Create deal error:", err);
+    res.status(err.status || 500).json({ error: err.message || "Failed to create deal" });
+  }
+});
+
+app.get("/api/deals", authenticateToken, async (req, res) => {
+  try {
+    const rows = await all(
+      "SELECT * FROM deals WHERE buyer_id = $1 OR farmer_id = $1 ORDER BY created_at DESC",
+      [req.user.id]
+    );
+    res.json(rows.map(formatDeal));
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch deals" });
   }
 });
 
-app.get("/api/deals/:id", async (req, res) => {
+app.get("/api/deals/:id", authenticateToken, async (req, res) => {
   try {
-    const r = await get("SELECT * FROM deals WHERE id = $1", [req.params.id]);
-    if (!r) return res.status(404).json({ error: "Deal not found" });
-    const formatted = {
-      id: r.id,
-      farmer: r.farmer,
-      buyer: r.buyer,
-      farmerId: r.farmer_id,
-      buyerId: r.buyer_id,
-      lotId: r.lot_id,
-      crop: r.crop,
-      quantityQt: r.quantity_qt,
-      grade: r.grade,
-      agreedPrice: r.agreed_price,
-      offer: r.offer,
-      counterOffer: r.counter_offer,
-      paymentGiven: Boolean(r.payment_given),
-      paymentReceived: Boolean(r.payment_received),
-      transactionMode: r.transaction_mode,
-      status: r.status,
-      date: r.date,
-    };
-    res.json(formatted);
+    const deal = await getDealForUser(req.params.id, req.user);
+    res.json(formatDeal(deal));
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch deal details" });
+    res.status(err.status || 500).json({ error: err.message || "Failed to fetch deal details" });
   }
 });
 
+app.get("/api/deals/:id/offers", authenticateToken, async (req, res) => {
+  try {
+    await getDealForUser(req.params.id, req.user);
+    const rows = await all("SELECT * FROM deal_offers WHERE deal_id = $1 ORDER BY created_at ASC", [req.params.id]);
+    res.json(rows.map(formatOffer));
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message || "Failed to fetch offer history" });
+  }
+});
+
+app.post("/api/deals/:id/offers", authenticateToken, async (req, res) => {
+  try {
+    const deal = await getDealForUser(req.params.id, req.user);
+    assertMutable(deal);
+    const offer = await insertOffer({
+      deal,
+      user: req.user,
+      quantity: req.body.quantity,
+      pricePerUnit: req.body.pricePerUnit,
+      message: req.body.message,
+    });
+    res.status(201).json(offer);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message || "Failed to send offer" });
+  }
+});
+
+app.post("/api/deals/:id/counter", authenticateToken, async (req, res) => {
+  try {
+    const deal = await getDealForUser(req.params.id, req.user);
+    assertMutable(deal);
+    const offer = await insertOffer({
+      deal,
+      user: req.user,
+      quantity: req.body.quantity,
+      pricePerUnit: req.body.pricePerUnit,
+      message: req.body.message || "Counter offer",
+    });
+    res.status(201).json(offer);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message || "Failed to send counter offer" });
+  }
+});
+
+app.post("/api/deals/:id/accept", authenticateToken, async (req, res) => {
+  try {
+    const deal = await getDealForUser(req.params.id, req.user);
+    assertMutable(deal);
+    await acceptLatestOffer(deal, req.user);
+    const updated = await get("SELECT * FROM deals WHERE id = $1", [deal.id]);
+    res.json(formatDeal(updated));
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message || "Failed to accept offer" });
+  }
+});
+
+app.post("/api/deals/:id/reject", authenticateToken, async (req, res) => {
+  try {
+    const deal = await getDealForUser(req.params.id, req.user);
+    assertMutable(deal);
+    const offer = await latestOffer(deal.id);
+    if (offer) await run("UPDATE deal_offers SET status = $1 WHERE id = $2", ["REJECTED", offer.id]);
+    await run("UPDATE deals SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2", ["REJECTED", deal.id]);
+    const updated = await get("SELECT * FROM deals WHERE id = $1", [deal.id]);
+    res.json(formatDeal(updated));
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message || "Failed to reject offer" });
+  }
+});
+
+app.post("/api/deals/:id/payment-sent", authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== "Buyer") return res.status(403).json({ error: "Only buyer can mark payment sent" });
+    const deal = await getDealForUser(req.params.id, req.user);
+    assertMutable(deal);
+    if (normalizeDealStatus(deal.status) !== "PAYMENT_PENDING" && normalizeDealStatus(deal.status) !== "AGREED") {
+      return res.status(409).json({ error: "Payment can be sent only after offer agreement" });
+    }
+    await run(
+      `UPDATE deals SET payment_given = 1, payment_status = $1, status = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
+      ["SENT", "PAYMENT_SENT", deal.id]
+    );
+    const updated = await get("SELECT * FROM deals WHERE id = $1", [deal.id]);
+    res.json(formatDeal(updated));
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message || "Failed to mark payment sent" });
+  }
+});
+
+app.post("/api/deals/:id/payment-received", authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== "Farmer") return res.status(403).json({ error: "Only farmer can mark payment received" });
+    const deal = await getDealForUser(req.params.id, req.user);
+    assertMutable(deal);
+    if (!deal.payment_given && derivePaymentStatus(deal) !== "SENT") {
+      return res.status(409).json({ error: "Buyer must mark payment sent before farmer confirms receipt" });
+    }
+    await run(
+      `UPDATE deals SET payment_received = 1, payment_status = $1, status = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
+      ["RECEIVED", "COMPLETED", deal.id]
+    );
+    const updated = await get("SELECT * FROM deals WHERE id = $1", [deal.id]);
+    res.json(formatDeal(updated));
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message || "Failed to mark payment received" });
+  }
+});
+
+// Backward-compatible restricted patch route for transaction mode only.
 app.patch("/api/deals/:id", authenticateToken, async (req, res) => {
   try {
-    const { id } = req.params;
-    const { transactionMode, paymentGiven, paymentReceived, status } = req.body;
-
-    const existing = await get("SELECT * FROM deals WHERE id = $1", [id]);
-    if (!existing) return res.status(404).json({ error: "Deal not found" });
-
-    const newMode = transactionMode !== undefined ? transactionMode : existing.transaction_mode;
-    const newGiven = paymentGiven !== undefined ? (paymentGiven ? 1 : 0) : existing.payment_given;
-    const newReceived = paymentReceived !== undefined ? (paymentReceived ? 1 : 0) : existing.payment_received;
-    const newStatus = status !== undefined ? status : existing.status;
-
-    await run(
-      `UPDATE deals SET transaction_mode = $1, payment_given = $2, payment_received = $3, status = $4 WHERE id = $5`,
-      [newMode, newGiven, newReceived, newStatus, id]
-    );
-
-    const updated = await get("SELECT * FROM deals WHERE id = $1", [id]);
-    res.json({
-      id: updated.id,
-      farmer: updated.farmer,
-      buyer: updated.buyer,
-      farmerId: updated.farmer_id,
-      buyerId: updated.buyer_id,
-      lotId: updated.lot_id,
-      crop: updated.crop,
-      quantityQt: updated.quantity_qt,
-      grade: updated.grade,
-      agreedPrice: updated.agreed_price,
-      offer: updated.offer,
-      counterOffer: updated.counter_offer,
-      paymentGiven: Boolean(updated.payment_given),
-      paymentReceived: Boolean(updated.payment_received),
-      transactionMode: updated.transaction_mode,
-      status: updated.status,
-      date: updated.date,
-    });
+    const deal = await getDealForUser(req.params.id, req.user);
+    const newMode = req.body.transactionMode !== undefined ? req.body.transactionMode : deal.transaction_mode;
+    await run("UPDATE deals SET transaction_mode = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2", [newMode, deal.id]);
+    const updated = await get("SELECT * FROM deals WHERE id = $1", [deal.id]);
+    res.json(formatDeal(updated));
   } catch (err) {
-    console.error("Update deal error:", err);
-    res.status(500).json({ error: "Failed to update deal" });
+    res.status(err.status || 500).json({ error: err.message || "Failed to update deal" });
   }
 });
 
 // Chat Messages for Deal Room
-app.get("/api/deals/:id/chat", async (req, res) => {
+app.get("/api/deals/:id/messages", authenticateToken, async (req, res) => {
   try {
+    await getDealForUser(req.params.id, req.user);
     const rows = await all("SELECT * FROM chat_messages WHERE deal_id = $1 ORDER BY created_at ASC", [req.params.id]);
-    const formatted = rows.map((r) => ({
-      id: r.id,
-      dealId: r.deal_id,
-      sender: r.sender,
-      text: r.text,
-      time: r.time,
-    }));
-    res.json(formatted);
+    res.json(rows.map(formatMessage));
   } catch (err) {
-    res.status(500).json({ error: "Failed to load chat messages" });
+    res.status(err.status || 500).json({ error: err.message || "Failed to load chat messages" });
+  }
+});
+
+app.post("/api/deals/:id/messages", authenticateToken, async (req, res) => {
+  try {
+    const deal = await getDealForUser(req.params.id, req.user);
+    const text = String(req.body.message || req.body.text || "").trim();
+    if (!text) return res.status(400).json({ error: "Message text cannot be empty" });
+
+    const msgId = `MSG-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+    const sender = req.user.name || (req.user.role === "Farmer" ? deal.farmer : deal.buyer);
+    const time = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+
+    await run(
+      `INSERT INTO chat_messages (id, deal_id, sender_id, sender, text, message, time) VALUES ($1, $2, $3, $4, $5, $5, $6)`,
+      [msgId, deal.id, req.user.id, sender, text, time]
+    );
+
+    const created = await get("SELECT * FROM chat_messages WHERE id = $1", [msgId]);
+    res.status(201).json(formatMessage(created));
+  } catch (err) {
+    console.error("Send chat error:", err);
+    res.status(err.status || 500).json({ error: err.message || "Failed to send message" });
+  }
+});
+
+app.get("/api/deals/:id/chat", authenticateToken, async (req, res) => {
+  try {
+    await getDealForUser(req.params.id, req.user);
+    const rows = await all("SELECT * FROM chat_messages WHERE deal_id = $1 ORDER BY created_at ASC", [req.params.id]);
+    res.json(rows.map(formatMessage));
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message || "Failed to load chat messages" });
   }
 });
 
 app.post("/api/deals/:id/chat", authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { text } = req.body;
-    if (!text || !text.trim()) {
-      return res.status(400).json({ error: "Message text cannot be empty" });
-    }
-
-    const msgId = `MSG-${Date.now()}`;
-    const sender = req.user.name || (req.user.role === "Farmer" ? "Farmer" : "Buyer");
-    const time = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
-
-    await run(
-      `INSERT INTO chat_messages (id, deal_id, sender, text, time) VALUES ($1, $2, $3, $4, $5)`,
-      [msgId, id, sender, text.trim(), time]
-    );
-
-    res.status(201).json({ id: msgId, dealId: id, sender, text: text.trim(), time });
-  } catch (err) {
-    console.error("Send chat error:", err);
-    res.status(500).json({ error: "Failed to send message" });
-  }
+  req.url = `/api/deals/${req.params.id}/messages`;
+  res.status(410).json({ error: "Use /api/deals/:id/messages for deal chat" });
 });
 
 // Sample / Quality registration

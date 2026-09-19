@@ -91,6 +91,7 @@ const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
+      { path: "deal-room", element: <Transactions /> },
       { path: "deal-room/:id", element: <DealRoom /> },
       { path: "bill/:id", element: <Bill /> },
       { path: "transactions", element: <Transactions /> },

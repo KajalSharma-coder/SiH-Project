@@ -1,30 +1,38 @@
-import { CheckCircle2, Download, FileText, Handshake, IndianRupee, MessageSquare, Printer, RefreshCcw, ShieldCheck, Send } from "lucide-react";
+import { CheckCircle2, Download, FileText, Handshake, IndianRupee, MessageSquare, Printer, RefreshCcw, Send, XCircle } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Section, StatCard } from "../components/Cards";
 import { FairTradeLogo } from "../components/Logo";
-import { getChatMessages, getDealById, getDeals, sendChatMessage, updateDeal } from "../services/api";
-import type { ChatMessage, Deal } from "../types";
+import { acceptDealOffer, getChatMessages, getDealById, getDealOffers, getDeals, markPaymentReceived, markPaymentSent, rejectDealOffer, sendChatMessage, sendCounterOffer, sendDealOffer } from "../services/api";
+import { useAuth } from "../context/AuthContext";
+import type { ChatMessage, Deal, DealOffer } from "../types";
 import { money, number } from "../utils/format";
 
 export function DealRoom() {
   const { id = "DL-9001" } = useParams();
+  const { user } = useAuth();
   const [deal, setDeal] = useState<Deal | null>(null);
+  const [offers, setOffers] = useState<DealOffer[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [acting, setActing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [dData, mData] = await Promise.all([
-          getDealById(id).catch(() => getDeals().then((all) => all[0])),
-          getChatMessages(id).catch(() => []),
+        const [dData, offerData, mData] = await Promise.all([
+          getDealById(id),
+          getDealOffers(id),
+          getChatMessages(id),
         ]);
         setDeal(dData);
+        setOffers(offerData);
         setMessages(mData);
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error loading deal room:", err);
+        setError(err.message || "Unable to load deal room.");
       } finally {
         setLoading(false);
       }
@@ -32,7 +40,7 @@ export function DealRoom() {
     loadData();
   }, [id]);
 
-  if (loading || !deal) {
+  if (loading) {
     return (
       <div className="grid min-h-[400px] place-items-center rounded-2xl bg-white p-8 shadow-soft">
         <div className="flex items-center gap-3 text-[#B96832] font-semibold">
@@ -43,28 +51,66 @@ export function DealRoom() {
     );
   }
 
-  const total = deal.agreedPrice * deal.quantityQt;
+  if (!deal) {
+    return <div className="rounded-md border border-red-200 bg-red-50 p-5 text-sm font-bold text-red-700">{error || "Deal not found."}</div>;
+  }
 
-  async function handleChooseMode(option: "Direct Deal" | "Use FairTrade") {
+  const isBuyer = user?.id === deal.buyerId;
+  const isFarmer = user?.id === deal.farmerId;
+  const latestOffer = offers[offers.length - 1];
+  const canRespondToLatest = latestOffer && latestOffer.senderId !== user?.id && !["COMPLETED", "REJECTED", "CANCELLED"].includes(deal.status);
+  const currentPrice = latestOffer?.pricePerUnit || deal.agreedPrice || deal.offer || deal.counterOffer;
+  const currentQuantity = latestOffer?.quantity || deal.quantityQt;
+  const total = currentPrice * currentQuantity;
+
+  async function reloadDeal() {
+    const [dData, offerData] = await Promise.all([getDealById(deal!.id), getDealOffers(deal!.id)]);
+    setDeal(dData);
+    setOffers(offerData);
+  }
+
+  async function handleOffer(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setActing(true);
+    const form = new FormData(event.currentTarget);
+    const payload = {
+      quantity: Number(form.get("quantity")),
+      pricePerUnit: Number(form.get("pricePerUnit")),
+      message: String(form.get("offerMessage") || "").trim(),
+    };
     try {
-      const updated = await updateDeal(deal!.id, { transactionMode: option });
-      setDeal(updated);
-    } catch (err) {
-      console.error(err);
+      if (offers.length === 0 || isBuyer) {
+        await sendDealOffer(deal!.id, payload);
+      } else {
+        await sendCounterOffer(deal!.id, payload);
+      }
+      event.currentTarget.reset();
+      await reloadDeal();
+    } catch (err: any) {
+      setError(err.message || "Failed to send offer.");
+    } finally {
+      setActing(false);
     }
   }
 
-  async function handleConfirmPayment() {
+  async function handleDealAction(action: "accept" | "reject" | "payment-sent" | "payment-received") {
+    setError(null);
+    setActing(true);
     try {
-      const updated = await updateDeal(deal!.id, {
-        paymentGiven: true,
-        paymentReceived: true,
-        transactionMode: "Use FairTrade",
-        status: "Completed",
-      });
+      const updated =
+        action === "accept" ? await acceptDealOffer(deal!.id) :
+        action === "reject" ? await rejectDealOffer(deal!.id) :
+        action === "payment-sent" ? await markPaymentSent(deal!.id) :
+        await markPaymentReceived(deal!.id);
       setDeal(updated);
-    } catch (err) {
-      console.error(err);
+      if (action === "accept" || action === "reject") {
+        setOffers(await getDealOffers(deal!.id));
+      }
+    } catch (err: any) {
+      setError(err.message || "Action failed.");
+    } finally {
+      setActing(false);
     }
   }
 
@@ -88,15 +134,14 @@ export function DealRoom() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <span className="inline-flex items-center gap-2 rounded-full bg-[#E9E1D2] px-3.5 py-1.5 text-xs font-bold text-[#B96832]">
-            <Handshake size={16} /> Buyer-Seller Deal Room
+            <Handshake size={16} /> {isBuyer ? "Buyer Deal Room" : isFarmer ? "Farmer Deal Room" : "Deal Room"}
           </span>
           <h1 className="mt-2 text-3xl font-black tracking-tight text-[#33291F]">Deal #{deal.id}</h1>
           <p className="text-sm text-[#765536] mt-0.5">
-            Discuss crop lot, negotiate price, select transaction option, and generate digital bill.
+            Negotiate privately, confirm payment step by step, and keep the deal record in one place.
           </p>
         </div>
         <Link
@@ -107,29 +152,28 @@ export function DealRoom() {
         </Link>
       </div>
 
-      {/* Metrics */}
+      {error && <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Agreed Rate" value={`${money(deal.agreedPrice)}/Qt`} icon={IndianRupee} />
+        <StatCard label={["AGREED", "PAYMENT_PENDING", "PAYMENT_SENT", "COMPLETED"].includes(deal.status) ? "Agreed Rate" : "Current Offer"} value={`${money(currentPrice)}/Qt`} icon={IndianRupee} />
         <StatCard label="Total Amount" value={money(total)} icon={IndianRupee} />
-        <StatCard label="Transaction Option" value={deal.transactionMode} icon={ShieldCheck} />
-        <StatCard label="Payment Status" value={deal.status} icon={RefreshCcw} />
+        <StatCard label="Deal Status" value={deal.status.replaceAll("_", " ")} icon={RefreshCcw} />
+        <StatCard label="Payment Status" value={deal.paymentStatus} icon={IndianRupee} />
       </div>
 
-      {/* Main Content */}
       <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
-        {/* Deal Overview & Options */}
         <section className="rounded-2xl border border-[#D8CDBB] bg-white p-6 shadow-soft space-y-6">
           <div>
-            <h2 className="text-xl font-black text-[#33291F]">Agreed Deal Summary</h2>
+            <h2 className="text-xl font-black text-[#33291F]">Deal Summary</h2>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               {[
-                ["Farmer", deal.farmer],
-                ["Buyer", deal.buyer],
+                [isBuyer ? "Farmer" : "Buyer", isBuyer ? deal.farmer : deal.buyer],
                 ["Crop / Lot ID", `${deal.crop} - ${deal.lotId}`],
-                ["Quantity", `${number(deal.quantityQt)} Quintals`],
+                ["Quantity", `${number(currentQuantity)} Quintals`],
                 ["Quality Grade", deal.grade],
-                ["Agreed Rate", `${money(deal.agreedPrice)} / Qt`],
-                ["Total Transaction Value", money(total)],
+                [["AGREED", "PAYMENT_PENDING", "PAYMENT_SENT", "COMPLETED"].includes(deal.status) ? "Agreed Rate" : "Current Price", `${money(currentPrice)} / Qt`],
+                ["Total Amount", money(total)],
+                ["Asking Price", `${money(deal.counterOffer || deal.agreedPrice)} / Qt`],
                 ["Date", deal.date],
               ].map(([label, val]) => (
                 <div key={label} className="rounded-xl bg-[#F4EFE4] p-3.5 border border-[#D8CDBB]">
@@ -140,71 +184,96 @@ export function DealRoom() {
             </div>
           </div>
 
-          {/* Transaction Choices */}
           <div className="rounded-xl border border-[#D8CDBB] p-5 bg-[#F4EFE4]">
-            <h3 className="text-lg font-extrabold text-[#33291F]">Select Transaction Option</h3>
-            <p className="text-xs text-[#765536] mt-0.5">
-              Choose how buyer and seller record this transaction.
-            </p>
-
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              {(["Direct Deal", "Use FairTrade"] as const).map((opt) => (
-                <button
-                  key={opt}
-                  type="button"
-                  onClick={() => handleChooseMode(opt)}
-                  className={`rounded-xl border p-4 text-left transition ${
-                    deal.transactionMode === opt
-                      ? "border-[#B96832] bg-[#E9E1D2] ring-2 ring-[#B96832]/20"
-                      : "border-[#D8CDBB] bg-white hover:border-[#B96832]/40"
-                  }`}
-                >
-                  <span className="font-extrabold text-[#33291F] block text-sm">{opt}</span>
-                  <span className="mt-1 block text-xs leading-relaxed text-[#765536]">
-                    {opt === "Direct Deal"
-                      ? "Buyer and seller settle payment independently. Digital bill is still generated."
-                      : "FairTrade records payment given and payment received status on the digital bill."}
-                  </span>
-                </button>
-              ))}
+            <h3 className="text-lg font-extrabold text-[#33291F]">Negotiation</h3>
+            <div className="mt-4 space-y-3">
+              {offers.length === 0 ? (
+                <p className="text-sm text-[#765536]">No offers yet.</p>
+              ) : (
+                offers.map((offer) => (
+                  <div key={offer.id} className={`rounded-md border p-3 text-sm ${offer.senderRole === "Buyer" ? "border-[#B96832]/30 bg-white" : "border-[#555633]/30 bg-[#E9E1D2]"}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-black text-[#33291F]">{offer.senderRole}</p>
+                      <span className="rounded-full bg-[#F4EFE4] px-2.5 py-1 text-[11px] font-bold text-[#765536]">{offer.status}</span>
+                    </div>
+                    <p className="mt-1 font-bold">{money(offer.pricePerUnit)}/qt for {number(offer.quantity)} qt</p>
+                    {offer.message && <p className="mt-1 text-xs text-[#765536]">{offer.message}</p>}
+                  </div>
+                ))
+              )}
             </div>
 
-            {deal.transactionMode === "Use FairTrade" && (
-              <div className="mt-5 rounded-xl bg-white p-4 border border-[#D8CDBB] space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
-                  <div>
-                    <p className="text-[#765536]"><b>Payment Given:</b> {deal.paymentGiven ? "Confirmed" : "Pending"}</p>
-                    <p className="text-[#765536] mt-0.5"><b>Payment Received:</b> {deal.paymentReceived ? "Confirmed" : "Pending"}</p>
-                  </div>
-                  <button
-                    onClick={handleConfirmPayment}
-                    className="rounded-xl bg-[#555633] px-4 py-2.5 text-xs font-bold text-[#F4EFE4] shadow-sm hover:bg-[#33291F]"
-                  >
-                    Confirm Payment Completion
+            {!["AGREED", "PAYMENT_PENDING", "PAYMENT_SENT", "COMPLETED", "REJECTED", "CANCELLED"].includes(deal.status) && (
+              <form onSubmit={handleOffer} className="mt-5 grid gap-3 md:grid-cols-[1fr_1fr]">
+                <label>
+                  <span className="mb-1 block text-xs font-bold text-[#765536]">Quantity (qt)</span>
+                  <input name="quantity" required type="number" min="1" step="0.01" defaultValue={currentQuantity} className="w-full rounded-md border border-[#D8CDBB] px-3 py-2 text-sm outline-none focus:border-[#B96832]" />
+                </label>
+                <label>
+                  <span className="mb-1 block text-xs font-bold text-[#765536]">Price per qt</span>
+                  <input name="pricePerUnit" required type="number" min="1" step="0.01" defaultValue={currentPrice} className="w-full rounded-md border border-[#D8CDBB] px-3 py-2 text-sm outline-none focus:border-[#B96832]" />
+                </label>
+                <label className="md:col-span-2">
+                  <span className="mb-1 block text-xs font-bold text-[#765536]">Message</span>
+                  <textarea name="offerMessage" className="min-h-20 w-full rounded-md border border-[#D8CDBB] px-3 py-2 text-sm outline-none focus:border-[#B96832]" placeholder="Add a note with your offer" />
+                </label>
+                <div className="md:col-span-2 flex flex-wrap gap-2">
+                  <button disabled={acting} className="inline-flex items-center gap-2 rounded-md bg-[#B96832] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-60">
+                    <Send size={15} /> {latestOffer ? "Send Counter Offer" : "Send Offer"}
                   </button>
+                  {canRespondToLatest && (
+                    <>
+                      <button type="button" disabled={acting} onClick={() => handleDealAction("accept")} className="inline-flex items-center gap-2 rounded-md bg-[#555633] px-4 py-2.5 text-xs font-bold text-[#F4EFE4] disabled:opacity-60">
+                        <CheckCircle2 size={15} /> Accept Offer
+                      </button>
+                      <button type="button" disabled={acting} onClick={() => handleDealAction("reject")} className="inline-flex items-center gap-2 rounded-md border border-red-200 bg-white px-4 py-2.5 text-xs font-bold text-red-700 disabled:opacity-60">
+                        <XCircle size={15} /> Reject Offer
+                      </button>
+                    </>
+                  )}
                 </div>
-              </div>
+              </form>
             )}
+          </div>
 
-            {deal.transactionMode === "Direct Deal" && (
-              <div className="mt-4 rounded-xl bg-[#F4EFE4] p-3.5 text-xs leading-relaxed text-[#765536] border border-[#D8CDBB]">
-                <b>Direct Deal Selected:</b> Independent settlement outside FairTrade. Bill invoice is stored for record purposes.
+          <div className="rounded-xl border border-[#D8CDBB] p-5 bg-white">
+            <h3 className="text-lg font-extrabold text-[#33291F]">Deal Status</h3>
+            <div className="mt-4 grid gap-2 sm:grid-cols-4">
+              {["NEGOTIATING", "AGREED", "PAYMENT_SENT", "COMPLETED"].map((step) => (
+                <div key={step} className={`rounded-md border p-3 text-xs font-bold ${deal.status === step || (step === "NEGOTIATING" && deal.status === "COUNTER_OFFER") ? "border-[#B96832] bg-[#E9E1D2] text-[#B96832]" : "border-[#D8CDBB] bg-[#F4EFE4] text-[#765536]"}`}>
+                  {step.replaceAll("_", " ")}
+                </div>
+              ))}
+            </div>
+            {isBuyer && (deal.status === "AGREED" || deal.status === "PAYMENT_PENDING") && (
+              <button disabled={acting} onClick={() => handleDealAction("payment-sent")} className="mt-4 rounded-md bg-[#555633] px-4 py-2.5 text-xs font-bold text-[#F4EFE4] disabled:opacity-60">
+                Mark Payment Sent
+              </button>
+            )}
+            {isBuyer && deal.status === "PAYMENT_SENT" && (
+              <p className="mt-4 rounded-md bg-[#F4EFE4] p-3 text-sm font-bold text-[#765536]">Payment Sent — Waiting for Farmer Confirmation</p>
+            )}
+            {isFarmer && deal.status === "PAYMENT_SENT" && (
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <p className="rounded-md bg-[#F4EFE4] p-3 text-sm font-bold text-[#765536]">Payment Sent — Confirm Payment Received</p>
+                <button disabled={acting} onClick={() => handleDealAction("payment-received")} className="rounded-md bg-[#555633] px-4 py-2.5 text-xs font-bold text-[#F4EFE4] disabled:opacity-60">
+                  Mark Payment Received
+                </button>
               </div>
             )}
           </div>
         </section>
 
-        {/* Chat Section */}
         <section className="rounded-2xl border border-[#D8CDBB] bg-white p-6 shadow-soft flex flex-col justify-between h-[550px]">
           <div>
             <div className="flex items-center gap-2 border-b border-[#D8CDBB] pb-3">
               <MessageSquare className="text-[#B96832]" size={20} />
-              <h2 className="text-xl font-black text-[#33291F]">Buyer-Seller Chat</h2>
+              <h2 className="text-xl font-black text-[#33291F]">Private Chat</h2>
             </div>
 
             <div className="mt-4 space-y-3 overflow-y-auto max-h-[380px] pr-1">
               {messages.map((msg) => (
-                <div key={msg.id} className="rounded-xl border border-[#D8CDBB] bg-[#F4EFE4] p-3 text-xs">
+                <div key={msg.id} className={`rounded-xl border p-3 text-xs ${msg.senderId === user?.id ? "border-[#B96832]/30 bg-[#E9E1D2]" : "border-[#D8CDBB] bg-[#F4EFE4]"}`}>
                   <div className="flex justify-between items-center mb-1 font-bold text-[#B96832]">
                     <span>{msg.sender}</span>
                     <span className="text-[10px] text-[#765536]">{msg.time}</span>
@@ -237,70 +306,150 @@ export function DealRoom() {
 }
 
 export function Transactions() {
+  const { user } = useAuth();
   const [deals, setDeals] = useState<Deal[]>([]);
+  const [activeFilter, setActiveFilter] = useState<DealFilter>("All");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
-    getDeals().then(setDeals).catch(console.error);
+    getDeals()
+      .then(setDeals)
+      .catch((err: any) => {
+        console.error(err);
+        setError(err.message || "Unable to load deals.");
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  const completed = deals.filter((d) => d.status === "Completed").length;
-  const pending = deals.length - completed;
+  const completed = deals.filter((d) => d.status === "COMPLETED").length;
+  const active = deals.filter((d) => isActiveDeal(d.status)).length;
+  const rejected = deals.filter((d) => isRejectedDeal(d.status)).length;
+  const filteredDeals = deals.filter((deal) => matchesDealFilter(deal, activeFilter));
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-black tracking-tight text-[#33291F]">Transaction History</h1>
+        <h1 className="text-3xl font-black tracking-tight text-[#33291F]">Deal Room</h1>
         <p className="mt-1 text-sm text-[#765536]">
-          Real database transaction log and accessible digital bills.
+          Your private deal history, negotiation rooms, payment status and digital bills.
         </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <StatCard label="Total Transactions" value={String(deals.length)} icon={Handshake} />
+        <StatCard label="Total Deals" value={String(deals.length)} icon={Handshake} />
+        <StatCard label="Active Deals" value={String(active)} icon={RefreshCcw} />
         <StatCard label="Completed Deals" value={String(completed)} icon={CheckCircle2} />
-        <StatCard label="Pending Payment" value={String(pending)} icon={RefreshCcw} />
       </div>
 
-      <Section title="Digital Bills & Deal Log">
-        <div className="overflow-x-auto rounded-2xl border border-[#D8CDBB] bg-white shadow-soft">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-[#F4EFE4] text-[#765536] font-bold">
-              <tr>
-                <th className="p-4">Deal ID</th>
-                <th className="p-4">Farmer / Buyer</th>
-                <th className="p-4">Crop / Lot</th>
-                <th className="p-4">Agreed Value</th>
-                <th className="p-4">Mode</th>
-                <th className="p-4">Status</th>
-                <th className="p-4">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#D8CDBB]">
-              {deals.map((deal) => (
-                <tr key={deal.id} className="hover:bg-[#F4EFE4] transition">
-                  <td className="p-4 font-black">
-                    <Link to={`/deal-room/${deal.id}`} className="text-[#B96832] hover:underline">
-                      {deal.id}
-                    </Link>
-                  </td>
-                  <td className="p-4 font-semibold text-[#33291F]">{deal.farmer} / {deal.buyer}</td>
-                  <td className="p-4 text-[#765536]">{deal.crop} - {deal.lotId}</td>
-                  <td className="p-4 font-black text-[#33291F]">{money(deal.agreedPrice * deal.quantityQt)}</td>
-                  <td className="p-4 text-xs font-medium">{deal.transactionMode}</td>
-                  <td className="p-4">
-                    <span className={`rounded-lg px-2.5 py-1 text-xs font-bold ${statusClass(deal.status)}`}>
-                      {deal.status}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <Link to={`/bill/${deal.id}`} className="font-bold text-xs text-[#B96832] hover:underline flex items-center gap-1">
-                      <FileText size={14} /> View Bill
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <Section title="Deal History">
+        <div className="mb-4 flex flex-wrap gap-2">
+          {[
+            ["All", deals.length],
+            ["Active", active],
+            ["Completed", completed],
+            ["Rejected", rejected],
+          ].map(([filter, count]) => (
+            <button
+              key={filter}
+              type="button"
+              onClick={() => setActiveFilter(filter as DealFilter)}
+              className={`rounded-md border px-3.5 py-2 text-xs font-bold transition ${
+                activeFilter === filter
+                  ? "border-[#B96832] bg-[#B96832] text-white"
+                  : "border-[#D8CDBB] bg-white text-[#765536] hover:border-[#B96832]/60"
+              }`}
+            >
+              {filter} ({count})
+            </button>
+          ))}
         </div>
+
+        {error && <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">{error}</div>}
+
+        {loading ? (
+          <div className="grid min-h-[240px] place-items-center rounded-2xl border border-[#D8CDBB] bg-white shadow-soft">
+            <div className="flex items-center gap-3 text-[#B96832] font-semibold">
+              <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#B96832] border-t-transparent" />
+              Loading deals...
+            </div>
+          </div>
+        ) : filteredDeals.length === 0 ? (
+          <div className="rounded-2xl border border-[#D8CDBB] bg-white p-8 text-center shadow-soft">
+            <p className="text-sm font-bold text-[#33291F]">No {activeFilter.toLowerCase()} deals found.</p>
+            <p className="mt-1 text-xs text-[#765536]">Deals you start or receive will appear here automatically.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-2xl border border-[#D8CDBB] bg-white shadow-soft">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-[#F4EFE4] font-bold text-[#765536]">
+                <tr>
+                  <th className="p-4">Deal</th>
+                  <th className="p-4">{user?.role === "Buyer" ? "Farmer" : "Buyer"}</th>
+                  <th className="p-4">Produce</th>
+                  <th className="p-4">Quantity</th>
+                  <th className="p-4">Price</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4">Payment</th>
+                  <th className="p-4">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#D8CDBB]">
+                {filteredDeals.map((deal) => {
+                  const unitPrice = getDealPrice(deal);
+                  const total = unitPrice * deal.quantityQt;
+                  const otherParty = user?.role === "Buyer" ? deal.farmer : deal.buyer;
+
+                  return (
+                    <tr key={deal.id} className="transition hover:bg-[#F4EFE4]">
+                      <td className="p-4 font-black">
+                        <Link to={`/deal-room/${deal.id}`} className="text-[#B96832] hover:underline">
+                          {deal.id}
+                        </Link>
+                        <span className="mt-1 block text-[11px] font-semibold text-[#765536]">{deal.date}</span>
+                      </td>
+                      <td className="p-4 font-semibold text-[#33291F]">
+                        {otherParty}
+                        <span className="mt-1 block text-[11px] font-medium text-[#765536]">
+                          {user?.role === "Buyer" ? "Farmer" : "Buyer"}
+                        </span>
+                      </td>
+                      <td className="p-4 text-[#765536]">
+                        <b className="block text-[#33291F]">{deal.crop}</b>
+                        <span className="text-xs">{deal.grade} - {deal.lotId}</span>
+                      </td>
+                      <td className="p-4 font-semibold text-[#33291F]">{number(deal.quantityQt)} Qt</td>
+                      <td className="p-4 text-[#33291F]">
+                        <b className="block">{money(unitPrice)} / Qt</b>
+                        <span className="text-xs text-[#765536]">{money(total)} total</span>
+                      </td>
+                      <td className="p-4">
+                        <span className={`rounded-lg px-2.5 py-1 text-xs font-bold ${statusClass(deal.status)}`}>
+                          {deal.status.replaceAll("_", " ")}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <span className={`rounded-lg px-2.5 py-1 text-xs font-bold ${paymentClass(deal.paymentStatus)}`}>
+                          {deal.paymentStatus}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex flex-wrap gap-2">
+                          <Link to={`/deal-room/${deal.id}`} className="inline-flex items-center gap-1 rounded-md bg-[#B96832] px-3 py-2 text-xs font-bold text-white hover:bg-[#9D5529]">
+                            <Handshake size={14} /> Open Deal
+                          </Link>
+                          <Link to={`/bill/${deal.id}`} className="inline-flex items-center gap-1 rounded-md border border-[#D8CDBB] px-3 py-2 text-xs font-bold text-[#765536] hover:border-[#B96832]/60">
+                            <FileText size={14} /> Bill
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Section>
     </div>
   );
@@ -365,7 +514,7 @@ export function Bill() {
             </p>
           </div>
           <span className={`rounded-xl px-4 py-2 text-xs font-black ${statusClass(deal.status)}`}>
-            {deal.status}
+            {deal.status.replaceAll("_", " ")}
           </span>
         </div>
 
@@ -402,9 +551,36 @@ function BillRow({ label, value, strong }: { label: string; value: string; stron
   );
 }
 
+type DealFilter = "All" | "Active" | "Completed" | "Rejected";
+
+function isActiveDeal(status: Deal["status"]) {
+  return !["COMPLETED", "REJECTED", "CANCELLED"].includes(status);
+}
+
+function isRejectedDeal(status: Deal["status"]) {
+  return status === "REJECTED" || status === "CANCELLED";
+}
+
+function matchesDealFilter(deal: Deal, filter: DealFilter) {
+  if (filter === "Completed") return deal.status === "COMPLETED";
+  if (filter === "Rejected") return isRejectedDeal(deal.status);
+  if (filter === "Active") return isActiveDeal(deal.status);
+  return true;
+}
+
+function getDealPrice(deal: Deal) {
+  return deal.agreedPrice || deal.counterOffer || deal.offer;
+}
+
 function statusClass(status: string) {
-  if (status === "Completed") return "bg-cyan-50 text-cyan-700";
-  if (status === "Failed") return "bg-red-50 text-red-700";
-  if (status === "In Progress") return "bg-[#555633] text-[#F4EFE4]";
+  if (status === "COMPLETED") return "bg-cyan-50 text-cyan-700";
+  if (status === "REJECTED" || status === "CANCELLED") return "bg-red-50 text-red-700";
+  if (status === "PAYMENT_SENT" || status === "PAYMENT_PENDING") return "bg-[#555633] text-[#F4EFE4]";
+  return "bg-[#E9E1D2] text-[#33291F]";
+}
+
+function paymentClass(status: Deal["paymentStatus"]) {
+  if (status === "RECEIVED") return "bg-cyan-50 text-cyan-700";
+  if (status === "SENT") return "bg-[#555633] text-[#F4EFE4]";
   return "bg-[#E9E1D2] text-[#33291F]";
 }

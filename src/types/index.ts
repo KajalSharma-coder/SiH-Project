@@ -69,6 +69,8 @@ export type Deal = {
   id: string;
   farmer: string;
   buyer: string;
+  farmerId: string;
+  buyerId: string;
   lotId: string;
   crop: Crop;
   quantityQt: number;
@@ -78,9 +80,25 @@ export type Deal = {
   counterOffer: number;
   paymentGiven: boolean;
   paymentReceived: boolean;
+  paymentStatus: "PENDING" | "SENT" | "RECEIVED";
   transactionMode: "Direct Deal" | "Use FairTrade";
-  status: "Offer Sent" | "Negotiating" | "Payment Pending" | "Completed";
+  status: "NEGOTIATING" | "COUNTER_OFFER" | "AGREED" | "PAYMENT_PENDING" | "PAYMENT_SENT" | "COMPLETED" | "REJECTED" | "CANCELLED";
   date: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type DealOffer = {
+  id: string;
+  dealId: string;
+  senderId: string;
+  senderRole: "Buyer" | "Farmer";
+  quantity: number;
+  pricePerUnit: number;
+  totalAmount: number;
+  message: string;
+  status: "PENDING" | "ACCEPTED" | "REJECTED";
+  createdAt: string;
 };
 
 export type Activity = {
@@ -102,7 +120,9 @@ export type DemoSession = {
 export type ChatMessage = {
   id: string;
   dealId: string;
+  senderId?: string;
   sender: string;
   text: string;
   time: string;
+  createdAt?: string;
 };

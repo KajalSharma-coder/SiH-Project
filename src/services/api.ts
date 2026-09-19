@@ -1,4 +1,4 @@
-import type { ChatMessage, Deal, Demand, Lot, MarketQuote, MatchScore } from "../types";
+import type { ChatMessage, Deal, DealOffer, Demand, Lot, MarketQuote, MatchScore } from "../types";
 
 const API_BASE = (import.meta as any).env?.VITE_API_URL || "http://localhost:5000/api";
 
@@ -94,6 +94,13 @@ export async function getDealById(id: string) {
   return request<Deal>(`/deals/${id}`);
 }
 
+export async function startDeal(payload: { lotId: string; quantity: number; pricePerUnit: number; message?: string }) {
+  return request<Deal>("/deals", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function updateDeal(id: string, patch: Partial<Deal>) {
   return request<Deal>(`/deals/${id}`, {
     method: "PATCH",
@@ -101,15 +108,49 @@ export async function updateDeal(id: string, patch: Partial<Deal>) {
   });
 }
 
+export async function getDealOffers(dealId: string) {
+  return request<DealOffer[]>(`/deals/${dealId}/offers`);
+}
+
+export async function sendDealOffer(dealId: string, payload: { quantity: number; pricePerUnit: number; message?: string }) {
+  return request<DealOffer>(`/deals/${dealId}/offers`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function sendCounterOffer(dealId: string, payload: { quantity: number; pricePerUnit: number; message?: string }) {
+  return request<DealOffer>(`/deals/${dealId}/counter`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function acceptDealOffer(dealId: string) {
+  return request<Deal>(`/deals/${dealId}/accept`, { method: "POST" });
+}
+
+export async function rejectDealOffer(dealId: string) {
+  return request<Deal>(`/deals/${dealId}/reject`, { method: "POST" });
+}
+
+export async function markPaymentSent(dealId: string) {
+  return request<Deal>(`/deals/${dealId}/payment-sent`, { method: "POST" });
+}
+
+export async function markPaymentReceived(dealId: string) {
+  return request<Deal>(`/deals/${dealId}/payment-received`, { method: "POST" });
+}
+
 // ---------- Chat APIs ----------
 export async function getChatMessages(dealId: string) {
-  return request<ChatMessage[]>(`/deals/${dealId}/chat`);
+  return request<ChatMessage[]>(`/deals/${dealId}/messages`);
 }
 
 export async function sendChatMessage(dealId: string, text: string) {
-  return request<ChatMessage>(`/deals/${dealId}/chat`, {
+  return request<ChatMessage>(`/deals/${dealId}/messages`, {
     method: "POST",
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ message: text }),
   });
 }
 

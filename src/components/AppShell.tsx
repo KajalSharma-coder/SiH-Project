@@ -10,7 +10,7 @@ const sharedItems: NavItem[] = [
   ["Marketplace", "/marketplace", Store],
   ["Price Prediction", "/price-prediction", BarChart3],
   ["Daily Price Tracking", "/daily-prices", PackageCheck],
-  ["Transactions", "/transactions", FileText],
+  ["Deal Room", "/deal-room", FileText],
 ] as const satisfies NavItem[];
 
 export function AppShell() {

@@ -32,7 +32,8 @@ export function FarmerDashboard() {
 
   const myLots = user ? lots.filter((lot) => lot.farmerId === user.id || lot.farmerName === user.name) : lots;
   const shownLots = myLots.length ? myLots : lots;
-  const activeDeals = deals.filter((deal) => deal.status !== "Completed");
+  const myDeals = user ? deals.filter((deal) => deal.farmerId === user.id || deal.farmer === user.name) : deals;
+  const activeDeals = myDeals.filter((deal) => deal.status !== "COMPLETED");
   const reliability = shownLots.length ? Math.round(shownLots.reduce((sum, lot) => sum + lot.reliability, 0) / shownLots.length) : 0;
 
   return (
@@ -52,7 +53,7 @@ export function FarmerDashboard() {
           <QuickAction to="/farmer/create-lot" icon={Plus} label="Add Produce" />
           <QuickAction to="/marketplace" icon={Store} label="Marketplace" />
           <QuickAction to="/price-prediction" icon={TrendingUp} label="Check Prices" />
-          <QuickAction to="/transactions" icon={FileText} label="Transactions" />
+          <QuickAction to="/deal-room" icon={FileText} label="Deal Room" />
         </div>
       </section>
 
@@ -85,6 +86,10 @@ export function FarmerDashboard() {
             </table>
           )}
         </div>
+      </Section>
+
+      <Section title="My Deal Requests" subtitle="Incoming buyer offers and active negotiations for your lots.">
+        <DealRequests deals={myDeals} />
       </Section>
     </div>
   );
@@ -249,6 +254,39 @@ function Info({ label, value }: { label: string; value: string }) {
     <div className="rounded-md bg-[#F4EFE4] p-3 text-sm">
       <p className="text-xs text-[#765536]">{label}</p>
       <p className="font-bold">{value}</p>
+    </div>
+  );
+}
+
+function DealRequests({ deals }: { deals: Deal[] }) {
+  if (deals.length === 0) return <EmptyState text="No incoming deal requests yet." />;
+
+  return (
+    <div className="overflow-x-auto rounded-md border border-[#D8CDBB] bg-white">
+      <table className="min-w-full text-left text-sm">
+        <thead className="bg-[#F4EFE4] text-[#765536]">
+          <tr>
+            <th className="p-4">Buyer</th>
+            <th className="p-4">Produce</th>
+            <th className="p-4">Quantity</th>
+            <th className="p-4">Offer Price</th>
+            <th className="p-4">Status</th>
+            <th className="p-4">Action</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-[#D8CDBB]">
+          {deals.map((deal) => (
+            <tr key={deal.id}>
+              <td className="p-4 font-bold text-[#33291F]">{deal.buyer}</td>
+              <td className="p-4">{deal.crop}<span className="block text-xs text-[#765536]">{deal.lotId}</span></td>
+              <td className="p-4">{deal.quantityQt} qt</td>
+              <td className="p-4 font-bold text-[#33291F]">{money(deal.offer || deal.agreedPrice)}/qt</td>
+              <td className="p-4"><span className="rounded-full bg-[#E9E1D2] px-3 py-1 text-xs font-bold text-[#B96832]">{deal.status.replaceAll("_", " ")}</span></td>
+              <td className="p-4"><Link to={`/deal-room/${deal.id}`} className="text-xs font-bold text-[#B96832] hover:underline">Open Deal Room</Link></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

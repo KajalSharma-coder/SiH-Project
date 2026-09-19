@@ -97,8 +97,8 @@ export const demands: Demand[] = [
 ];
 
 export const deals: Deal[] = [
-  { id: "DL-9001", farmer: "Iqbal Khan", buyer: "Kisan Retail Chain", lotId: "LOT-1044", crop: "Gram", quantityQt: 120, grade: "Lab Verified", agreedPrice: 5860, offer: 5800, counterOffer: 5920, paymentGiven: true, paymentReceived: false, transactionMode: "Use FairTrade", status: "Payment Pending", date: "17 Sep 2026" },
-  { id: "DL-9002", farmer: "Ramesh Meena", buyer: "Shakti Foods Pvt Ltd", lotId: "LOT-1042", crop: "Wheat", quantityQt: 150, grade: "FAQ", agreedPrice: 2705, offer: 2660, counterOffer: 2725, paymentGiven: true, paymentReceived: true, transactionMode: "Use FairTrade", status: "Completed", date: "16 Sep 2026" },
+  { id: "DL-9001", farmer: "Iqbal Khan", buyer: "Kisan Retail Chain", farmerId: "F-21", buyerId: "B-14", lotId: "LOT-1044", crop: "Gram", quantityQt: 120, grade: "Lab Verified", agreedPrice: 5860, offer: 5800, counterOffer: 5920, paymentGiven: true, paymentReceived: false, paymentStatus: "SENT", transactionMode: "Use FairTrade", status: "PAYMENT_SENT", date: "17 Sep 2026" },
+  { id: "DL-9002", farmer: "Ramesh Meena", buyer: "Shakti Foods Pvt Ltd", farmerId: "F-12", buyerId: "B-8", lotId: "LOT-1042", crop: "Wheat", quantityQt: 150, grade: "FAQ", agreedPrice: 2705, offer: 2660, counterOffer: 2725, paymentGiven: true, paymentReceived: true, paymentStatus: "RECEIVED", transactionMode: "Use FairTrade", status: "COMPLETED", date: "16 Sep 2026" },
 ];
 
 export const activities: Activity[] = [

@@ -3,7 +3,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Section, StatCard } from "../components/Cards";
 import { useAuth } from "../context/AuthContext";
-import { createDemand, getDeals, getDemands, getLots, scoreMatches } from "../services/api";
+import { createDemand, getDeals, getDemands, getLots, scoreMatches, startDeal } from "../services/api";
 import type { Crop, Deal, Demand, Grade, Lot } from "../types";
 import { money } from "../utils/format";
 import { EmptyState, Loading, PageHeader } from "./Market";
@@ -34,7 +34,8 @@ export function BuyerDashboard() {
   const shownDemands = myDemands.length ? myDemands : demands;
   const firstDemand = shownDemands[0];
   const matches = firstDemand ? scoreMatches(firstDemand, lots) : [];
-  const activeDeals = deals.filter((deal) => deal.status !== "Completed");
+  const myDeals = user ? deals.filter((deal) => deal.buyerId === user.id || deal.buyer === user.name) : deals;
+  const activeDeals = myDeals.filter((deal) => deal.status !== "COMPLETED");
 
   return (
     <div className="space-y-5">
@@ -53,7 +54,7 @@ export function BuyerDashboard() {
           <QuickAction to="/buyer/demand" icon={Plus} label="Add Requirement" />
           <QuickAction to="/marketplace" icon={Store} label="Marketplace" />
           <QuickAction to="/price-prediction" icon={TrendingUp} label="Check Prices" />
-          <QuickAction to="/transactions" icon={FileText} label="Transactions" />
+          <QuickAction to="/deal-room" icon={FileText} label="Deal Room" />
         </div>
       </section>
 
@@ -86,6 +87,10 @@ export function BuyerDashboard() {
             </table>
           )}
         </div>
+      </Section>
+
+      <Section title="My Deals" subtitle="Active negotiations, payment pending and completed trade rooms.">
+        <DealList deals={myDeals} />
       </Section>
 
       {firstDemand && <MatchesSection demand={firstDemand} lots={lots} />}
@@ -169,11 +174,36 @@ export function BuyerMatches() {
 }
 
 function MatchesSection({ demand, lots }: { demand?: Demand; lots: Lot[] }) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [startingLot, setStartingLot] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const matches = useMemo(() => (demand ? scoreMatches(demand, lots) : []), [demand, lots]);
   if (!demand) return null;
+  const activeDemand = demand;
+
+  async function handleStartDeal(lot: Lot) {
+    if (!user) return;
+    setError(null);
+    setStartingLot(lot.id);
+    try {
+      const deal = await startDeal({
+        lotId: lot.id,
+        quantity: Math.min(activeDemand.quantityQt, lot.quantityQt),
+        pricePerUnit: lot.expectedPrice,
+        message: `Initial offer for ${Math.min(activeDemand.quantityQt, lot.quantityQt)} qt of ${lot.crop}.`,
+      });
+      navigate(`/deal-room/${deal.id}`);
+    } catch (err: any) {
+      setError(err.message || "Failed to start deal.");
+    } finally {
+      setStartingLot(null);
+    }
+  }
 
   return (
     <Section title="Matching Produce">
+      {error && <div className="mb-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
       <div className="grid gap-3 md:grid-cols-2">
         {matches.length === 0 ? (
           <EmptyState text="No matching produce found for the selected requirement." />
@@ -188,15 +218,57 @@ function MatchesSection({ demand, lots }: { demand?: Demand; lots: Lot[] }) {
                 <span className="rounded-full bg-[#E9E1D2] px-3 py-1 text-xs font-bold text-[#B96832]">{match.total}% match</span>
               </div>
               <p className="mt-3 text-sm font-bold text-[#33291F]">{money(match.lot.expectedPrice)}/qt</p>
-              <Link to="/transactions" className="mt-4 inline-flex rounded-md bg-[#B96832] px-3 py-2 text-xs font-bold text-white">
-                Make Offer
-              </Link>
+              <button
+                type="button"
+                disabled={startingLot === match.lot.id || user?.role !== "Buyer"}
+                onClick={() => handleStartDeal(match.lot)}
+                className="mt-4 inline-flex rounded-md bg-[#B96832] px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {startingLot === match.lot.id ? "Opening..." : "Start Deal"}
+              </button>
             </article>
           ))
         )}
       </div>
     </Section>
   );
+}
+
+function DealList({ deals }: { deals: Deal[] }) {
+  if (deals.length === 0) return <EmptyState text="No deals yet. Start from a matching produce lot." />;
+
+  return (
+    <div className="overflow-x-auto rounded-md border border-[#D8CDBB] bg-white">
+      <table className="min-w-full text-left text-sm">
+        <thead className="bg-[#F4EFE4] text-[#765536]">
+          <tr>
+            <th className="p-4">Deal</th>
+            <th className="p-4">Farmer / Produce</th>
+            <th className="p-4">Quantity</th>
+            <th className="p-4">Status</th>
+            <th className="p-4">Payment</th>
+            <th className="p-4">Action</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-[#D8CDBB]">
+          {deals.map((deal) => (
+            <tr key={deal.id}>
+              <td className="p-4 font-black text-[#33291F]">{deal.id}</td>
+              <td className="p-4">{deal.farmer}<span className="block text-xs text-[#765536]">{deal.crop} - {deal.lotId}</span></td>
+              <td className="p-4">{deal.quantityQt} qt</td>
+              <td className="p-4"><StatusPill value={deal.status} /></td>
+              <td className="p-4">{deal.paymentStatus}</td>
+              <td className="p-4"><Link to={`/deal-room/${deal.id}`} className="text-xs font-bold text-[#B96832] hover:underline">Open Deal Room</Link></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function StatusPill({ value }: { value: string }) {
+  return <span className="rounded-full bg-[#E9E1D2] px-3 py-1 text-xs font-bold text-[#B96832]">{value.replaceAll("_", " ")}</span>;
 }
 
 function Field({ name, label, type = "text", defaultValue }: { name: string; label: string; type?: string; defaultValue?: string }) {

@@ -134,6 +134,24 @@ export async function initDb() {
     )
   `);
 
+  await run(`ALTER TABLE deals ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'PENDING'`);
+  await run(`ALTER TABLE deals ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP`);
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS deal_offers (
+      id TEXT PRIMARY KEY,
+      deal_id TEXT NOT NULL REFERENCES deals(id) ON DELETE CASCADE,
+      sender_id TEXT NOT NULL,
+      sender_role TEXT NOT NULL,
+      quantity REAL NOT NULL,
+      price_per_unit REAL NOT NULL,
+      total_amount REAL NOT NULL,
+      message TEXT,
+      status TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   await run(`
     CREATE TABLE IF NOT EXISTS chat_messages (
       id TEXT PRIMARY KEY,
@@ -144,6 +162,9 @@ export async function initDb() {
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  await run(`ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS sender_id TEXT`);
+  await run(`ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS message TEXT`);
 
   await run(`
     CREATE TABLE IF NOT EXISTS market_quotes (
@@ -290,13 +311,31 @@ export async function initDb() {
   const dealCount = await get("SELECT COUNT(*) as count FROM deals");
   if (Number(dealCount.count) === 0) {
     const defaultDeals = [
-      { id: "DL-9001", farmer: "Iqbal Khan", buyer: "Kisan Retail Chain", farmer_id: "F-103", buyer_id: "B-105", lot_id: "LOT-1044", crop: "Gram", quantity_qt: 120, grade: "Lab Verified", agreed_price: 5860, offer: 5800, counter_offer: 5920, payment_given: 1, payment_received: 0, transaction_mode: "Use FairTrade", status: "Payment Pending", date: "17 Sep 2026" },
-      { id: "DL-9002", farmer: "Ramesh Meena", buyer: "Shakti Foods Pvt Ltd", farmer_id: "F-101", buyer_id: "B-101", lot_id: "LOT-1042", crop: "Wheat", quantity_qt: 150, grade: "FAQ", agreed_price: 2705, offer: 2660, counter_offer: 2725, payment_given: 1, payment_received: 1, transaction_mode: "Use FairTrade", status: "Completed", date: "16 Sep 2026" }
+      { id: "DL-9001", farmer: "Iqbal Khan", buyer: "Kisan Retail Chain", farmer_id: "F-103", buyer_id: "B-105", lot_id: "LOT-1044", crop: "Gram", quantity_qt: 120, grade: "Lab Verified", agreed_price: 5860, offer: 5800, counter_offer: 5920, payment_given: 1, payment_received: 0, transaction_mode: "Use FairTrade", status: "PAYMENT_SENT", payment_status: "SENT", date: "17 Sep 2026" },
+      { id: "DL-9002", farmer: "Ramesh Meena", buyer: "Shakti Foods Pvt Ltd", farmer_id: "F-101", buyer_id: "B-101", lot_id: "LOT-1042", crop: "Wheat", quantity_qt: 150, grade: "FAQ", agreed_price: 2705, offer: 2660, counter_offer: 2725, payment_given: 1, payment_received: 1, transaction_mode: "Use FairTrade", status: "COMPLETED", payment_status: "RECEIVED", date: "16 Sep 2026" }
     ];
     for (const item of defaultDeals) {
       await run(
-        `INSERT INTO deals (id, farmer, buyer, farmer_id, buyer_id, lot_id, crop, quantity_qt, grade, agreed_price, offer, counter_offer, payment_given, payment_received, transaction_mode, status, date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
-        [item.id, item.farmer, item.buyer, item.farmer_id, item.buyer_id, item.lot_id, item.crop, item.quantity_qt, item.grade, item.agreed_price, item.offer, item.counter_offer, item.payment_given, item.payment_received, item.transaction_mode, item.status, item.date]
+        `INSERT INTO deals (id, farmer, buyer, farmer_id, buyer_id, lot_id, crop, quantity_qt, grade, agreed_price, offer, counter_offer, payment_given, payment_received, transaction_mode, status, payment_status, date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+        [item.id, item.farmer, item.buyer, item.farmer_id, item.buyer_id, item.lot_id, item.crop, item.quantity_qt, item.grade, item.agreed_price, item.offer, item.counter_offer, item.payment_given, item.payment_received, item.transaction_mode, item.status, item.payment_status, item.date]
+      );
+    }
+  }
+
+  const offerCount = await get("SELECT COUNT(*) as count FROM deal_offers");
+  if (Number(offerCount.count) === 0) {
+    const defaultOffers = [
+      { id: "OFF-9001-A", deal_id: "DL-9001", sender_id: "B-105", sender_role: "Buyer", quantity: 120, price_per_unit: 5800, total_amount: 696000, message: "Can take the full verified gram lot.", status: "PENDING" },
+      { id: "OFF-9001-B", deal_id: "DL-9001", sender_id: "F-103", sender_role: "Farmer", quantity: 120, price_per_unit: 5920, total_amount: 710400, message: "Counter offer based on lab verified grade.", status: "PENDING" },
+      { id: "OFF-9001-C", deal_id: "DL-9001", sender_id: "B-105", sender_role: "Buyer", quantity: 120, price_per_unit: 5860, total_amount: 703200, message: "Accepted middle price.", status: "ACCEPTED" },
+      { id: "OFF-9002-A", deal_id: "DL-9002", sender_id: "B-101", sender_role: "Buyer", quantity: 150, price_per_unit: 2660, total_amount: 399000, message: "Initial wheat offer.", status: "PENDING" },
+      { id: "OFF-9002-B", deal_id: "DL-9002", sender_id: "F-101", sender_role: "Farmer", quantity: 150, price_per_unit: 2725, total_amount: 408750, message: "Counter offer for verified quality.", status: "PENDING" },
+      { id: "OFF-9002-C", deal_id: "DL-9002", sender_id: "B-101", sender_role: "Buyer", quantity: 150, price_per_unit: 2705, total_amount: 405750, message: "Accepted final rate.", status: "ACCEPTED" }
+    ];
+    for (const item of defaultOffers) {
+      await run(
+        `INSERT INTO deal_offers (id, deal_id, sender_id, sender_role, quantity, price_per_unit, total_amount, message, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [item.id, item.deal_id, item.sender_id, item.sender_role, item.quantity, item.price_per_unit, item.total_amount, item.message, item.status]
       );
     }
   }

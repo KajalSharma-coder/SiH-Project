@@ -1,7 +1,8 @@
 import { Filter, HandCoins, Package, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { getDemands, getLots } from "../services/api";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { getDemands, getLots, startDeal } from "../services/api";
 import type { Demand, Lot } from "../types";
 import { money } from "../utils/format";
 
@@ -100,6 +101,29 @@ export function Market() {
 }
 
 function LotMarketCard({ lot }: { lot: Lot }) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleStartDeal() {
+    setError(null);
+    setStarting(true);
+    try {
+      const deal = await startDeal({
+        lotId: lot.id,
+        quantity: lot.quantityQt,
+        pricePerUnit: lot.expectedPrice,
+        message: `Initial offer for ${lot.quantityQt} qt of ${lot.crop}.`,
+      });
+      navigate(`/deal-room/${deal.id}`);
+    } catch (err: any) {
+      setError(err.message || "Failed to start deal.");
+    } finally {
+      setStarting(false);
+    }
+  }
+
   return (
     <article className="rounded-md border border-[#D8CDBB] bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -121,14 +145,20 @@ function LotMarketCard({ lot }: { lot: Lot }) {
         </div>
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
-        <Link to={`/deal-room/${lot.id}`} className="inline-flex items-center gap-2 rounded-md border border-[#555633] px-3 py-2 text-xs font-bold text-[#555633]">
+        <Link to="/transactions" className="inline-flex items-center gap-2 rounded-md border border-[#555633] px-3 py-2 text-xs font-bold text-[#555633]">
           View Details
         </Link>
-        <Link to="/transactions" className="inline-flex items-center gap-2 rounded-md bg-[#B96832] px-3 py-2 text-xs font-bold text-white">
+        <button
+          type="button"
+          disabled={starting || user?.role !== "Buyer"}
+          onClick={handleStartDeal}
+          className="inline-flex items-center gap-2 rounded-md bg-[#B96832] px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
           <HandCoins size={15} />
-          Make Offer
-        </Link>
+          {starting ? "Opening..." : "Start Deal"}
+        </button>
       </div>
+      {error && <p className="mt-3 text-xs font-bold text-red-700">{error}</p>}
     </article>
   );
 }
