@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 
 const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
 
@@ -21,7 +21,11 @@ function shutdown(signal) {
 
   for (const child of processes) {
     if (!child.killed) {
-      child.kill(signal);
+      if (process.platform === "win32") {
+        execFileSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+      } else {
+        child.kill(signal);
+      }
     }
   }
 }

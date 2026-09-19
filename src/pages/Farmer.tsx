@@ -2,6 +2,7 @@ import { FileText, Handshake, Package, Plus, ShieldCheck, Store, TrendingUp, Use
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Section, StatCard } from "../components/Cards";
+import { MarketFields } from "../components/MarketFields";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { createLot, getDeals, getDemands, getLots, registerSample } from "../services/api";
@@ -143,8 +144,7 @@ export function CreateLot() {
         <Select name="grade" label={t("common.grade")} options={["FAQ", "A", "Premium", "Lab Verified", "Organic"]} />
         <Field name="quantityQt" label={t("forms.quantityQuintals")} type="number" />
         <Field name="expectedPrice" label={t("forms.expectedPrice")} type="number" />
-        <Field name="city" label={t("common.city")} defaultValue="Kota" />
-        <Field name="mandi" label={t("common.mandi")} defaultValue="Ramganj Mandi" />
+        <MarketFields cityLabel={t("common.city")} mandiLabel={t("common.mandi")} inputClass={inputClass} />
         <label className="md:col-span-2">
           <span className="mb-1 block text-xs font-bold text-[#765536]">{t("forms.qualityNotes")}</span>
           <textarea name="declaredQuality" required className={`${inputClass} min-h-28`} placeholder={t("forms.qualityPlaceholder")} />

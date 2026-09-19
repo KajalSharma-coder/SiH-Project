@@ -27,6 +27,13 @@ export type MarketQuote = {
   forecast: ForecastPoint[];
 };
 
+export type Market = {
+  id: string;
+  state: string;
+  city: string;
+  name: string;
+};
+
 export type Lot = {
   id: string;
   farmerId: string;

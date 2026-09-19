@@ -26,9 +26,6 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Initialize database
-await initDb();
-
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
@@ -145,6 +142,22 @@ app.get("/api/market-quotes", async (req, res) => {
   } catch (err) {
     console.error("Market quotes fetch error:", err);
     res.status(500).json({ error: "Failed to load market quotes" });
+  }
+});
+
+// Mandi / Market master data
+app.get("/api/markets", async (req, res) => {
+  try {
+    const rows = await all("SELECT id, state, city, name FROM markets ORDER BY state, city, name");
+    res.json(rows.map((row) => ({
+      id: String(row.id),
+      state: row.state,
+      city: row.city,
+      name: row.name,
+    })));
+  } catch (err) {
+    console.error("Markets fetch error:", err);
+    res.status(500).json({ error: "Failed to load markets" });
   }
 });
 
@@ -661,6 +674,7 @@ app.post("/api/quality/samples", authenticateToken, async (req, res) => {
 
 const server = app.listen(PORT, () => {
   console.log(`FairTrade Backend API server running on port ${PORT}`);
+  initializeDatabase();
 });
 
 server.on("error", (error) => {
@@ -672,3 +686,14 @@ server.on("error", (error) => {
   console.error("Backend server failed to start:", error);
   process.exit(1);
 });
+
+async function initializeDatabase() {
+  try {
+    const initialized = await initDb();
+    if (initialized) {
+      console.log("FairTrade database initialized successfully");
+    }
+  } catch (error) {
+    console.error("FairTrade database initialization failed:", error);
+  }
+}

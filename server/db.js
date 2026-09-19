@@ -7,6 +7,32 @@ import { fileURLToPath } from "node:url";
 const { Pool } = pg;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+export const jaipurMarketMaster = [
+  "Chomu (Grain)",
+  "Jaipur (Grain)",
+  "Jaipur(Grain)(Chandpole)",
+  "Kishan Renwal(Fulera)",
+  "Kishangarh Renwal",
+  "Kotputli",
+  "Sambhar (Kishangarh renwal)",
+  "Bagru",
+  "Chaksu",
+  "Bassi",
+  "Kotputli(Pawla)",
+  "Chomu (F&V)",
+  "Jaipur(Grain)(Sodala)",
+  "Dudu APMC",
+  "Bassi APMC",
+  "Chomu Grain APMC",
+  "Chaksu APMC",
+  "Kishangarh Renwal APMC",
+  "Bagru APMC",
+  "Rajdhanai Mandi (KukarKheda)",
+  "Rajdhanai Mandi (KukarKheda) APMC",
+  "Rajdhanai Mandi KukarKheda APMC",
+  "Jaipur (Grain) APMC",
+];
+
 dotenv.config({ path: path.join(__dirname, ".env") });
 dotenv.config();
 
@@ -224,6 +250,19 @@ export async function initDb() {
     )
   `);
 
+  await run(`
+    CREATE TABLE IF NOT EXISTS markets (
+      id BIGSERIAL PRIMARY KEY,
+      state TEXT NOT NULL,
+      city TEXT NOT NULL,
+      name TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (state, city, name)
+    )
+  `);
+
+  await run(`CREATE UNIQUE INDEX IF NOT EXISTS markets_state_city_name_key ON markets (state, city, name)`);
+
   // Seed default demo users if users table is empty
   const userCount = await get("SELECT COUNT(*) as count FROM users");
   if (Number(userCount.count) === 0) {
@@ -243,29 +282,7 @@ export async function initDb() {
     const jaipurMandis = [
       "Chandpole Mandi",
       "Sanganer Mandi",
-      "Chomu (Grain)",
-      "Jaipur (Grain)",
-      "Jaipur(Grain)(Chandpole)",
-      "Kishan Renwal(Fulera)",
-      "Kishangarh Renwal",
-      "Kotputli",
-      "Sambhar (Kishangarh renwal)",
-      "Bagru",
-      "Chaksu",
-      "Bassi",
-      "Kotputli(Pawla)",
-      "Chomu (F&V)",
-      "Jaipur(Grain)(Sodala)",
-      "Dudu APMC",
-      "Bassi APMC",
-      "Chomu Grain APMC",
-      "Chaksu APMC",
-      "Kishangarh Renwal APMC",
-      "Bagru APMC",
-      "Rajdhanai Mandi (KukarKheda)",
-      "Rajdhanai Mandi (KukarKheda) APMC",
-      "Rajdhanai Mandi KukarKheda APMC",
-      "Jaipur (Grain) APMC",
+      ...jaipurMarketMaster,
     ];
     const locations = [
       { state: "Rajasthan", city: "Kota", mandis: ["Ramganj Mandi", "Kota Krishi Upaj Mandi"] },
@@ -282,6 +299,17 @@ export async function initDb() {
     const baseByCrop = { Wheat: 2575, Rice: 3120, Mustard: 5870, Maize: 2240, Gram: 5520 };
     const gradePremium = { FAQ: 0, A: 85, Premium: 180, "Lab Verified": 240, Organic: 360 };
     const cityLift = { Kota: 70, Jaipur: 115, Bundi: 35, Alwar: 95, Ajmer: 55, Jodhpur: 130, Delhi: 175 };
+
+    for (const loc of locations) {
+      for (const mandi of loc.mandis) {
+        await run(
+          `INSERT INTO markets (state, city, name)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (state, city, name) DO NOTHING`,
+          [loc.state, loc.city, mandi]
+        );
+      }
+    }
 
     function forecast(base, seed) {
       return [

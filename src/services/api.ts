@@ -1,4 +1,4 @@
-import type { ChatMessage, Deal, DealOffer, Demand, Lot, MarketQuote, MatchScore } from "../types";
+import type { ChatMessage, Deal, DealOffer, Demand, Lot, Market, MarketQuote, MatchScore } from "../types";
 
 const API_BASE = (import.meta as any).env?.VITE_API_URL || "http://localhost:5000/api";
 
@@ -59,6 +59,10 @@ export async function getCurrentUser() {
 // ---------- Market Quotes API ----------
 export async function getMarketQuotes() {
   return request<MarketQuote[]>("/market-quotes");
+}
+
+export async function getMarkets() {
+  return request<Market[]>("/markets");
 }
 
 // ---------- Produce Lots APIs ----------

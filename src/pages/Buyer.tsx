@@ -2,6 +2,7 @@ import { FileText, HandCoins, PackageSearch, Plus, ShieldCheck, ShoppingBasket, 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Section, StatCard } from "../components/Cards";
+import { MarketFields } from "../components/MarketFields";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { createDemand, getDeals, getDemands, getLots, scoreMatches, startDeal } from "../services/api";
@@ -153,8 +154,7 @@ export function BuyerDemand() {
             <input name="maxPrice" required type="number" className={inputClass} placeholder={t("forms.max")} />
           </div>
         </div>
-        <Field name="city" label={t("common.city")} defaultValue="Kota" />
-        <Field name="mandi" label={t("common.mandi")} defaultValue="Ramganj Mandi" />
+        <MarketFields cityLabel={t("common.city")} mandiLabel={t("common.mandi")} inputClass={inputClass} />
         <div className="md:col-span-2 flex justify-end gap-3">
           <Link to="/buyer/dashboard" className="rounded-md border border-[#555633] px-5 py-3 text-sm font-bold text-[#555633]">{t("common.cancel")}</Link>
           <button disabled={submitting} className="rounded-md bg-[#555633] px-5 py-3 text-sm font-bold text-[#F4EFE4]">{submitting ? t("common.saving") : t("forms.saveRequirement")}</button>
