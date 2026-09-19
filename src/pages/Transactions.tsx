@@ -478,7 +478,7 @@ export function Bill() {
   const total = deal.agreedPrice * deal.quantityQt;
 
   function downloadBill() {
-    const content = `FAIRTRADE DIGITAL BILL / INVOICE\n-----------------------------------\n${t("bill.reference")}: ${deal!.id}\n${t("common.date")}: ${deal!.date}\n${t("bill.transactionOption")}: ${deal!.transactionMode}\n${t("bill.farmerSeller")}: ${deal!.farmer}\n${t("common.buyer")}: ${deal!.buyer}\n${t("bill.cropLot")}: ${deal!.crop} (${deal!.lotId})\n${t("common.quantity")}: ${deal!.quantityQt} ${t("common.quintal")}\n${t("deal.qualityGrade")}: ${deal!.grade}\n${t("deal.agreedRate")}: ${deal!.agreedPrice} / Qt\n${t("common.totalAmount")}: ${total}\n${t("deal.paymentStatus")}: ${statusLabel(deal!.status)}\n${t("bill.paymentGivenStatus")}: ${deal!.paymentGiven ? t("common.confirmed") : t("common.pending")}\n${t("bill.paymentReceivedStatus")}: ${deal!.paymentReceived ? t("common.confirmed") : t("common.pending")}\n`;
+    const content = `FAIRTRADE DIGITAL BILL / INVOICE\n-----------------------------------\n${t("bill.reference")}: ${deal!.id}\n${t("common.date")}: ${deal!.date}\n${t("bill.transactionOption")}: ${deal!.transactionMode}\n${t("bill.farmerSeller")}: ${deal!.farmer}\n${t("common.buyer")}: ${deal!.buyer}\n${t("bill.cropLot")}: ${deal!.crop} (${deal!.lotId})\n${t("common.mandi")}: ${deal!.marketName}${deal!.marketCity ? `, ${deal!.marketCity}` : ""}\n${t("common.quantity")}: ${deal!.quantityQt} ${t("common.quintal")}\n${t("deal.qualityGrade")}: ${deal!.grade}\n${t("deal.agreedRate")}: ${deal!.agreedPrice} / Qt\n${t("common.totalAmount")}: ${total}\n${t("deal.paymentStatus")}: ${statusLabel(deal!.status)}\n${t("bill.paymentGivenStatus")}: ${deal!.paymentGiven ? t("common.confirmed") : t("common.pending")}\n${t("bill.paymentReceivedStatus")}: ${deal!.paymentReceived ? t("common.confirmed") : t("common.pending")}\n`;
     const blob = new Blob([content], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -528,6 +528,7 @@ export function Bill() {
           <BillRow label={t("bill.sellerFarmer")} value={deal.farmer} />
           <BillRow label={t("common.buyer")} value={deal.buyer} />
           <BillRow label={t("deal.cropAndLot")} value={`${deal.crop} - ${deal.lotId}`} />
+          <BillRow label={t("common.mandi")} value={deal.marketCity ? `${deal.marketName}, ${deal.marketCity}` : deal.marketName} />
           <BillRow label={t("deal.qualityGrade")} value={deal.grade} />
           <BillRow label={t("common.quantity")} value={`${number(deal.quantityQt)} ${t("common.quintal")}`} />
           <BillRow label={t("deal.agreedRate")} value={`${money(deal.agreedPrice)} / ${t("common.quintal")}`} />

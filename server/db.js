@@ -480,6 +480,48 @@ export async function initDb() {
     WHERE d.market_id IS NULL
       AND l.id = d.lot_id
   `);
+  await run(`
+    UPDATE lots l
+    SET market_id = NULL
+    WHERE l.market_id IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM markets m WHERE m.id = l.market_id)
+  `);
+  await run(`
+    UPDATE demands d
+    SET market_id = NULL
+    WHERE d.market_id IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM markets m WHERE m.id = d.market_id)
+  `);
+  await run(`
+    UPDATE deals d
+    SET market_id = NULL
+    WHERE d.market_id IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM markets m WHERE m.id = d.market_id)
+  `);
+  await run(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'lots_market_id_fkey') THEN
+        ALTER TABLE lots ADD CONSTRAINT lots_market_id_fkey FOREIGN KEY (market_id) REFERENCES markets(id);
+      END IF;
+    END $$;
+  `);
+  await run(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'demands_market_id_fkey') THEN
+        ALTER TABLE demands ADD CONSTRAINT demands_market_id_fkey FOREIGN KEY (market_id) REFERENCES markets(id);
+      END IF;
+    END $$;
+  `);
+  await run(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'deals_market_id_fkey') THEN
+        ALTER TABLE deals ADD CONSTRAINT deals_market_id_fkey FOREIGN KEY (market_id) REFERENCES markets(id);
+      END IF;
+    END $$;
+  `);
   databaseStatus = { connected: true, error: null };
   return true;
 }
