@@ -30,8 +30,8 @@ export function Home() {
         className="relative isolate min-h-[570px] overflow-hidden border-b border-[#D8CDBB] bg-[#E9E1D2] bg-no-repeat sm:min-h-[610px] lg:min-h-[660px]"
         style={{
           backgroundImage: "url('/assets/fairtrade-hero-bg.jpg')",
-          backgroundPosition: "center bottom",
-          backgroundSize: "min(100%, 1600px) auto",
+          backgroundPosition: "center top",
+          backgroundSize: "cover",
         }}
       >
         <div className="absolute inset-0 -z-10 bg-[#FFF8EC]/5" />

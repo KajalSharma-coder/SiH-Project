@@ -46,7 +46,7 @@ export function AppShell() {
         </div>
       </header>
 
-      <div className="mx-auto flex min-h-screen max-w-[1440px]">
+      <div className="flex min-h-screen">
         <aside
           className={`fixed inset-y-0 left-0 z-50 w-64 border-r border-[#45472B] bg-[#555633] px-4 py-5 transition-transform lg:sticky lg:top-0 lg:translate-x-0 ${
             open ? "translate-x-0" : "-translate-x-full"
