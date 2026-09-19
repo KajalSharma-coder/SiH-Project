@@ -130,6 +130,7 @@ export function BuyerDemand() {
         maxPrice: Number(form.get("maxPrice")),
         city: String(form.get("city")),
         mandi: String(form.get("mandi")),
+        marketId: String(form.get("marketId")),
       });
       navigate("/buyer/dashboard");
     } catch (err: any) {
@@ -259,7 +260,11 @@ function DealList({ deals }: { deals: Deal[] }) {
           {deals.map((deal) => (
             <tr key={deal.id}>
               <td className="p-4 font-black text-[#33291F]">{deal.id}</td>
-              <td className="p-4">{deal.farmer}<span className="block text-xs text-[#765536]">{deal.crop} - {deal.lotId}</span></td>
+              <td className="p-4">
+                {deal.farmer}
+                <span className="block text-xs text-[#765536]">{deal.crop} - {deal.lotId}</span>
+                {deal.marketName && <span className="block text-xs text-[#765536]">{deal.marketName}</span>}
+              </td>
               <td className="p-4">{deal.quantityQt} qt</td>
               <td className="p-4"><StatusPill value={statusLabel(deal.status)} /></td>
               <td className="p-4">{paymentLabel(deal.paymentStatus)}</td>

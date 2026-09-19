@@ -262,6 +262,12 @@ export async function initDb() {
   `);
 
   await run(`CREATE UNIQUE INDEX IF NOT EXISTS markets_state_city_name_key ON markets (state, city, name)`);
+  await run(`ALTER TABLE lots ADD COLUMN IF NOT EXISTS market_id BIGINT REFERENCES markets(id)`);
+  await run(`ALTER TABLE demands ADD COLUMN IF NOT EXISTS market_id BIGINT REFERENCES markets(id)`);
+  await run(`ALTER TABLE deals ADD COLUMN IF NOT EXISTS market_id BIGINT REFERENCES markets(id)`);
+  await run(`CREATE INDEX IF NOT EXISTS lots_market_id_idx ON lots (market_id)`);
+  await run(`CREATE INDEX IF NOT EXISTS demands_market_id_idx ON demands (market_id)`);
+  await run(`CREATE INDEX IF NOT EXISTS deals_market_id_idx ON deals (market_id)`);
 
   // Seed default demo users if users table is empty
   const userCount = await get("SELECT COUNT(*) as count FROM users");
@@ -379,7 +385,8 @@ export async function initDb() {
 
     for (const item of defaultLots) {
       await run(
-        `INSERT INTO lots (id, farmer_id, farmer_name, crop, grade, declared_quality, lab_status, quantity_qt, expected_price, city, mandi, reliability, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+        `INSERT INTO lots (id, farmer_id, farmer_name, crop, grade, declared_quality, lab_status, quantity_qt, expected_price, city, mandi, reliability, status, market_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, (SELECT id FROM markets WHERE city = $10 AND name = $11 LIMIT 1))`,
         [item.id, item.farmer_id, item.farmer_name, item.crop, item.grade, item.declared_quality, item.lab_status, item.quantity_qt, item.expected_price, item.city, item.mandi, item.reliability, item.status]
       );
     }
@@ -395,7 +402,8 @@ export async function initDb() {
     ];
     for (const item of defaultDemands) {
       await run(
-        `INSERT INTO demands (id, buyer_id, buyer_name, crop, grade, quantity_qt, min_price, max_price, city, mandi) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        `INSERT INTO demands (id, buyer_id, buyer_name, crop, grade, quantity_qt, min_price, max_price, city, mandi, market_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, (SELECT id FROM markets WHERE city = $9 AND name = $10 LIMIT 1))`,
         [item.id, item.buyer_id, item.buyer_name, item.crop, item.grade, item.quantity_qt, item.min_price, item.max_price, item.city, item.mandi]
       );
     }
@@ -410,7 +418,8 @@ export async function initDb() {
     ];
     for (const item of defaultDeals) {
       await run(
-        `INSERT INTO deals (id, farmer, buyer, farmer_id, buyer_id, lot_id, crop, quantity_qt, grade, agreed_price, offer, counter_offer, payment_given, payment_received, transaction_mode, status, payment_status, date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+        `INSERT INTO deals (id, farmer, buyer, farmer_id, buyer_id, lot_id, crop, quantity_qt, grade, agreed_price, offer, counter_offer, payment_given, payment_received, transaction_mode, status, payment_status, date, market_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, (SELECT market_id FROM lots WHERE id = $6))`,
         [item.id, item.farmer, item.buyer, item.farmer_id, item.buyer_id, item.lot_id, item.crop, item.quantity_qt, item.grade, item.agreed_price, item.offer, item.counter_offer, item.payment_given, item.payment_received, item.transaction_mode, item.status, item.payment_status, item.date]
       );
     }
@@ -446,6 +455,31 @@ export async function initDb() {
       ["MSG-2", "DL-9001", "Kisan Retail Chain", "Agreed at Rs 5,860/Qt. Please share payment confirmation after weighing.", "10:22 AM"]
     );
   }
+
+  await run(`
+    UPDATE lots l
+    SET market_id = m.id
+    FROM markets m
+    WHERE l.market_id IS NULL
+      AND m.city = l.city
+      AND m.name = l.mandi
+  `);
+  await run(`
+    UPDATE demands d
+    SET market_id = m.id
+    FROM markets m
+    WHERE d.market_id IS NULL
+      AND m.city = d.city
+      AND m.name = d.mandi
+  `);
+  await run(`
+    UPDATE deals d
+    SET market_id = COALESCE(l.market_id, m.id)
+    FROM lots l
+    LEFT JOIN markets m ON m.city = l.city AND m.name = l.mandi
+    WHERE d.market_id IS NULL
+      AND l.id = d.lot_id
+  `);
   databaseStatus = { connected: true, error: null };
   return true;
 }

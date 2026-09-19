@@ -126,6 +126,7 @@ export function CreateLot() {
         expectedPrice: Number(form.get("expectedPrice")),
         city: String(form.get("city")),
         mandi: String(form.get("mandi")),
+        marketId: String(form.get("marketId")),
         declaredQuality: String(form.get("declaredQuality")),
       });
       navigate("/farmer/dashboard");
@@ -284,7 +285,11 @@ function DealRequests({ deals }: { deals: Deal[] }) {
           {deals.map((deal) => (
             <tr key={deal.id}>
               <td className="p-4 font-bold text-[#33291F]">{deal.buyer}</td>
-              <td className="p-4">{deal.crop}<span className="block text-xs text-[#765536]">{deal.lotId}</span></td>
+              <td className="p-4">
+                {deal.crop}
+                <span className="block text-xs text-[#765536]">{deal.lotId}</span>
+                {deal.marketName && <span className="block text-xs text-[#765536]">{deal.marketName}</span>}
+              </td>
               <td className="p-4">{deal.quantityQt} qt</td>
               <td className="p-4 font-bold text-[#33291F]">{money(deal.offer || deal.agreedPrice)}/qt</td>
               <td className="p-4"><span className="rounded-full bg-[#E9E1D2] px-3 py-1 text-xs font-bold text-[#B96832]">{statusLabel(deal.status)}</span></td>

@@ -46,6 +46,7 @@ export type Lot = {
   expectedPrice: number;
   city: string;
   mandi: string;
+  marketId?: string;
   reliability: number;
   status: "Active" | "Matched" | "In Deal" | "Sold";
 };
@@ -61,6 +62,7 @@ export type Demand = {
   maxPrice: number;
   city: string;
   mandi: string;
+  marketId?: string;
 };
 
 export type MatchScore = {
@@ -79,6 +81,9 @@ export type Deal = {
   farmerId: string;
   buyerId: string;
   lotId: string;
+  marketId?: string;
+  marketName: string;
+  marketCity: string;
   crop: Crop;
   quantityQt: number;
   grade: Grade;

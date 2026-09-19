@@ -177,6 +177,7 @@ app.get("/api/lots", async (req, res) => {
       expectedPrice: r.expected_price,
       city: r.city,
       mandi: r.mandi,
+      marketId: r.market_id ? String(r.market_id) : undefined,
       reliability: r.reliability,
       status: r.status,
     }));
@@ -188,20 +189,24 @@ app.get("/api/lots", async (req, res) => {
 
 app.post("/api/lots", authenticateToken, async (req, res) => {
   try {
-    const { crop, grade, declaredQuality, quantityQt, expectedPrice, city, mandi } = req.body;
-    if (!crop || !grade || !quantityQt || !expectedPrice || !city || !mandi) {
+    const { crop, grade, declaredQuality, quantityQt, expectedPrice, city, mandi, marketId } = req.body;
+    if (!crop || !grade || !quantityQt || !expectedPrice || !((city && mandi) || marketId)) {
       return res.status(400).json({ error: "Missing required produce lot fields." });
     }
     const id = `LOT-${Math.floor(2000 + Math.random() * 7000)}`;
     const farmerId = req.user.id;
     const farmerName = req.user.name;
+    const market = await findMarketFromSelection({ marketId, city, mandi });
+    if (!market) {
+      return res.status(400).json({ error: "Selected mandi/market was not found." });
+    }
 
     await run(
-      `INSERT INTO lots (id, farmer_id, farmer_name, crop, grade, declared_quality, lab_status, quantity_qt, expected_price, city, mandi, reliability, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-      [id, farmerId, farmerName, crop, grade, declaredQuality || "Standard quality produce", "Pending", Number(quantityQt), Number(expectedPrice), city, mandi, 90, "Active"]
+      `INSERT INTO lots (id, farmer_id, farmer_name, crop, grade, declared_quality, lab_status, quantity_qt, expected_price, city, mandi, reliability, status, market_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+      [id, farmerId, farmerName, crop, grade, declaredQuality || "Standard quality produce", "Pending", Number(quantityQt), Number(expectedPrice), market.city, market.name, 90, "Active", market.id]
     );
 
-    const created = { id, farmerId, farmerName, crop, grade, declaredQuality: declaredQuality || "Standard quality produce", labStatus: "Pending", quantityQt: Number(quantityQt), expectedPrice: Number(expectedPrice), city, mandi, reliability: 90, status: "Active" };
+    const created = { id, farmerId, farmerName, crop, grade, declaredQuality: declaredQuality || "Standard quality produce", labStatus: "Pending", quantityQt: Number(quantityQt), expectedPrice: Number(expectedPrice), city: market.city, mandi: market.name, marketId: String(market.id), reliability: 90, status: "Active" };
     res.status(201).json(created);
   } catch (err) {
     console.error("Create lot error:", err);
@@ -224,6 +229,7 @@ app.get("/api/demands", async (req, res) => {
       maxPrice: r.max_price,
       city: r.city,
       mandi: r.mandi,
+      marketId: r.market_id ? String(r.market_id) : undefined,
     }));
     res.json(formatted);
   } catch (err) {
@@ -233,20 +239,24 @@ app.get("/api/demands", async (req, res) => {
 
 app.post("/api/demands", authenticateToken, async (req, res) => {
   try {
-    const { crop, grade, quantityQt, minPrice, maxPrice, city, mandi } = req.body;
-    if (!crop || !grade || !quantityQt || !minPrice || !maxPrice || !city || !mandi) {
+    const { crop, grade, quantityQt, minPrice, maxPrice, city, mandi, marketId } = req.body;
+    if (!crop || !grade || !quantityQt || !minPrice || !maxPrice || !((city && mandi) || marketId)) {
       return res.status(400).json({ error: "Missing required demand fields." });
     }
     const id = `DEM-${Math.floor(900 + Math.random() * 800)}`;
     const buyerId = req.user.id;
     const buyerName = req.user.name;
+    const market = await findMarketFromSelection({ marketId, city, mandi });
+    if (!market) {
+      return res.status(400).json({ error: "Selected mandi/market was not found." });
+    }
 
     await run(
-      `INSERT INTO demands (id, buyer_id, buyer_name, crop, grade, quantity_qt, min_price, max_price, city, mandi) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-      [id, buyerId, buyerName, crop, grade, Number(quantityQt), Number(minPrice), Number(maxPrice), city, mandi]
+      `INSERT INTO demands (id, buyer_id, buyer_name, crop, grade, quantity_qt, min_price, max_price, city, mandi, market_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [id, buyerId, buyerName, crop, grade, Number(quantityQt), Number(minPrice), Number(maxPrice), market.city, market.name, market.id]
     );
 
-    const created = { id, buyerId, buyerName, crop, grade, quantityQt: Number(quantityQt), minPrice: Number(minPrice), maxPrice: Number(maxPrice), city, mandi };
+    const created = { id, buyerId, buyerName, crop, grade, quantityQt: Number(quantityQt), minPrice: Number(minPrice), maxPrice: Number(maxPrice), city: market.city, mandi: market.name, marketId: String(market.id) };
     res.status(201).json(created);
   } catch (err) {
     console.error("Create demand error:", err);
@@ -256,6 +266,16 @@ app.post("/api/demands", authenticateToken, async (req, res) => {
 
 const DEAL_STATUSES = new Set(["NEGOTIATING", "COUNTER_OFFER", "AGREED", "PAYMENT_PENDING", "PAYMENT_SENT", "COMPLETED", "REJECTED", "CANCELLED"]);
 const FINAL_STATUSES = new Set(["COMPLETED", "REJECTED", "CANCELLED"]);
+const DEAL_SELECT = `
+  SELECT
+    d.*,
+    COALESCE(m.id, l.market_id) AS market_id,
+    COALESCE(m.name, l.mandi) AS market_name,
+    COALESCE(m.city, l.city) AS market_city
+  FROM deals d
+  LEFT JOIN lots l ON l.id = d.lot_id
+  LEFT JOIN markets m ON m.id = COALESCE(d.market_id, l.market_id)
+`;
 
 function normalizeDealStatus(status) {
   const value = String(status || "NEGOTIATING").trim().toUpperCase().replace(/\s+/g, "_");
@@ -282,6 +302,9 @@ function formatDeal(row) {
     farmerId: row.farmer_id,
     buyerId: row.buyer_id,
     lotId: row.lot_id,
+    marketId: row.market_id ? String(row.market_id) : undefined,
+    marketName: row.market_name || "",
+    marketCity: row.market_city || "",
     crop: row.crop,
     quantityQt: Number(row.quantity_qt),
     grade: row.grade,
@@ -297,6 +320,28 @@ function formatDeal(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+async function findMarketBySelection(city, mandi) {
+  return get("SELECT id, state, city, name FROM markets WHERE city = $1 AND name = $2", [city, mandi]);
+}
+
+async function findMarketFromSelection({ marketId, city, mandi }) {
+  if (marketId) {
+    const market = await get("SELECT id, state, city, name FROM markets WHERE id = $1", [marketId]);
+    if (market) return market;
+  }
+
+  return findMarketBySelection(city, mandi);
+}
+
+async function findMarketForLot(lot) {
+  if (lot.market_id) {
+    const market = await get("SELECT id, state, city, name FROM markets WHERE id = $1", [lot.market_id]);
+    if (market) return market;
+  }
+
+  return findMarketBySelection(lot.city, lot.mandi);
 }
 
 function formatOffer(row) {
@@ -331,7 +376,7 @@ function isParticipant(deal, user) {
 }
 
 async function getDealForUser(dealId, user) {
-  const deal = await get("SELECT * FROM deals WHERE id = $1", [dealId]);
+  const deal = await get(`${DEAL_SELECT} WHERE d.id = $1`, [dealId]);
   if (!deal) {
     const error = new Error("Deal not found");
     error.status = 404;
@@ -441,6 +486,10 @@ app.post("/api/deals", authenticateToken, async (req, res) => {
     const lot = await get("SELECT * FROM lots WHERE id = $1", [lotId]);
     if (!lot) return res.status(404).json({ error: "Lot not found" });
     if (lot.farmer_id === req.user.id) return res.status(400).json({ error: "Buyer cannot start a deal on their own lot" });
+    const market = await findMarketForLot(lot);
+    if (!market) {
+      return res.status(400).json({ error: "Lot mandi/market was not found in the market master." });
+    }
 
     const qty = validatePositiveNumber(quantity || lot.quantity_qt, "Quantity");
     const price = validatePositiveNumber(pricePerUnit || lot.expected_price, "Price per unit");
@@ -448,16 +497,16 @@ app.post("/api/deals", authenticateToken, async (req, res) => {
     const today = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 
     await run(
-      `INSERT INTO deals (id, farmer, buyer, farmer_id, buyer_id, lot_id, crop, quantity_qt, grade, agreed_price, offer, counter_offer, payment_given, payment_received, transaction_mode, status, payment_status, date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10, $10, 0, 0, $11, $12, $13, $14)`,
-      [id, lot.farmer_name, req.user.name, lot.farmer_id, req.user.id, lot.id, lot.crop, qty, lot.grade, price, "Use FairTrade", "NEGOTIATING", "PENDING", today]
+      `INSERT INTO deals (id, farmer, buyer, farmer_id, buyer_id, lot_id, market_id, crop, quantity_qt, grade, agreed_price, offer, counter_offer, payment_given, payment_received, transaction_mode, status, payment_status, date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11, $11, 0, 0, $12, $13, $14, $15)`,
+      [id, lot.farmer_name, req.user.name, lot.farmer_id, req.user.id, lot.id, market.id, lot.crop, qty, lot.grade, price, "Use FairTrade", "NEGOTIATING", "PENDING", today]
     );
 
-    const deal = await get("SELECT * FROM deals WHERE id = $1", [id]);
+    const deal = await get(`${DEAL_SELECT} WHERE d.id = $1`, [id]);
     await insertOffer({ deal, user: req.user, quantity: qty, pricePerUnit: price, message: message || "Initial offer" });
     await run("UPDATE lots SET status = $1 WHERE id = $2", ["In Deal", lot.id]);
 
-    const created = await get("SELECT * FROM deals WHERE id = $1", [id]);
+    const created = await get(`${DEAL_SELECT} WHERE d.id = $1`, [id]);
     res.status(201).json(formatDeal(created));
   } catch (err) {
     console.error("Create deal error:", err);
@@ -468,7 +517,7 @@ app.post("/api/deals", authenticateToken, async (req, res) => {
 app.get("/api/deals", authenticateToken, async (req, res) => {
   try {
     const rows = await all(
-      "SELECT * FROM deals WHERE buyer_id = $1 OR farmer_id = $1 ORDER BY created_at DESC",
+      `${DEAL_SELECT} WHERE d.buyer_id = $1 OR d.farmer_id = $1 ORDER BY d.created_at DESC`,
       [req.user.id]
     );
     res.json(rows.map(formatDeal));
@@ -535,7 +584,7 @@ app.post("/api/deals/:id/accept", authenticateToken, async (req, res) => {
     const deal = await getDealForUser(req.params.id, req.user);
     assertMutable(deal);
     await acceptLatestOffer(deal, req.user);
-    const updated = await get("SELECT * FROM deals WHERE id = $1", [deal.id]);
+    const updated = await get(`${DEAL_SELECT} WHERE d.id = $1`, [deal.id]);
     res.json(formatDeal(updated));
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message || "Failed to accept offer" });
@@ -549,7 +598,7 @@ app.post("/api/deals/:id/reject", authenticateToken, async (req, res) => {
     const offer = await latestOffer(deal.id);
     if (offer) await run("UPDATE deal_offers SET status = $1 WHERE id = $2", ["REJECTED", offer.id]);
     await run("UPDATE deals SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2", ["REJECTED", deal.id]);
-    const updated = await get("SELECT * FROM deals WHERE id = $1", [deal.id]);
+    const updated = await get(`${DEAL_SELECT} WHERE d.id = $1`, [deal.id]);
     res.json(formatDeal(updated));
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message || "Failed to reject offer" });
@@ -568,7 +617,7 @@ app.post("/api/deals/:id/payment-sent", authenticateToken, async (req, res) => {
       `UPDATE deals SET payment_given = 1, payment_status = $1, status = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
       ["SENT", "PAYMENT_SENT", deal.id]
     );
-    const updated = await get("SELECT * FROM deals WHERE id = $1", [deal.id]);
+    const updated = await get(`${DEAL_SELECT} WHERE d.id = $1`, [deal.id]);
     res.json(formatDeal(updated));
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message || "Failed to mark payment sent" });
@@ -587,7 +636,7 @@ app.post("/api/deals/:id/payment-received", authenticateToken, async (req, res) 
       `UPDATE deals SET payment_received = 1, payment_status = $1, status = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
       ["RECEIVED", "COMPLETED", deal.id]
     );
-    const updated = await get("SELECT * FROM deals WHERE id = $1", [deal.id]);
+    const updated = await get(`${DEAL_SELECT} WHERE d.id = $1`, [deal.id]);
     res.json(formatDeal(updated));
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message || "Failed to mark payment received" });
@@ -600,7 +649,7 @@ app.patch("/api/deals/:id", authenticateToken, async (req, res) => {
     const deal = await getDealForUser(req.params.id, req.user);
     const newMode = req.body.transactionMode !== undefined ? req.body.transactionMode : deal.transaction_mode;
     await run("UPDATE deals SET transaction_mode = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2", [newMode, deal.id]);
-    const updated = await get("SELECT * FROM deals WHERE id = $1", [deal.id]);
+    const updated = await get(`${DEAL_SELECT} WHERE d.id = $1`, [deal.id]);
     res.json(formatDeal(updated));
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message || "Failed to update deal" });

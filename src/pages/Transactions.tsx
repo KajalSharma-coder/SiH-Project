@@ -171,6 +171,7 @@ export function DealRoom() {
               {[
                 [isBuyer ? t("common.farmer") : t("common.buyer"), isBuyer ? deal.farmer : deal.buyer],
                 [t("deal.cropLotId"), `${deal.crop} - ${deal.lotId}`],
+                [t("common.mandi"), deal.marketName],
                 [t("common.quantity"), `${number(currentQuantity)} ${t("common.quintal")}`],
                 [t("deal.qualityGrade"), deal.grade],
                 [["AGREED", "PAYMENT_PENDING", "PAYMENT_SENT", "COMPLETED"].includes(deal.status) ? t("deal.agreedRate") : t("deal.currentPrice"), `${money(currentPrice)} / Qt`],
@@ -420,6 +421,7 @@ export function Transactions() {
                       <td className="p-4 text-[#765536]">
                         <b className="block text-[#33291F]">{deal.crop}</b>
                         <span className="text-xs">{deal.grade} - {deal.lotId}</span>
+                        {deal.marketName && <span className="mt-1 block text-xs">{deal.marketName}</span>}
                       </td>
                       <td className="p-4 font-semibold text-[#33291F]">{number(deal.quantityQt)} Qt</td>
                       <td className="p-4 text-[#33291F]">
