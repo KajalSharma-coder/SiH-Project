@@ -5,7 +5,8 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "node dev.js",
+    "start:raw": "node server.js",
     "dev": "node dev.js"
   },
   "dependencies": {
