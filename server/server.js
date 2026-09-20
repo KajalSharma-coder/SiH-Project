@@ -6,17 +6,38 @@ import { initDb, run, get, all, getDatabaseStatus } from "./db.js";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
-const JWT_SECRET = process.env.JWT_SECRET || "fairtrade_sih_secret_key_2026";
-const ML_API_URL = process.env.ML_API_URL || "http://127.0.0.1:8001";
-const FRONTEND_ORIGINS = (process.env.FRONTEND_ORIGIN || "http://localhost:5173,http://127.0.0.1:5173")
+const HOST = "0.0.0.0";
+const JWT_SECRET = process.env.JWT_SECRET;
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL;
+const FRONTEND_URLS = (process.env.FRONTEND_URL || "")
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
-const LOCAL_DEV_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/;
+const isProduction = process.env.NODE_ENV === "production";
+
+if (isProduction && !JWT_SECRET) {
+  throw new Error("JWT_SECRET is required in production.");
+}
+
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  if (FRONTEND_URLS.includes(origin)) return true;
+
+  if (!isProduction) {
+    try {
+      const hostname = new URL(origin).hostname;
+      return hostname === "localhost" || hostname === "127.0.0.1";
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
+}
 
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || FRONTEND_ORIGINS.includes(origin) || LOCAL_DEV_ORIGIN.test(origin)) {
+    if (isAllowedOrigin(origin)) {
       callback(null, true);
       return;
     }
@@ -729,7 +750,13 @@ async function callMlPrediction(payload) {
   const timeout = setTimeout(() => controller.abort(), Number(process.env.ML_API_TIMEOUT_MS) || 10000);
 
   try {
-    const response = await fetch(`${ML_API_URL}/predict`, {
+    if (!ML_SERVICE_URL) {
+      const configError = new Error("ML_SERVICE_URL is required to call the ML prediction service.");
+      configError.status = 503;
+      throw configError;
+    }
+
+    const response = await fetch(`${ML_SERVICE_URL}/predict`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -804,8 +831,8 @@ app.get("/api/ml/predict", async (req, res) => {
   }
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`FairTrade Backend API server running on port ${PORT}`);
+const server = app.listen(PORT, HOST, () => {
+  console.log(`FairTrade Backend API server running on ${HOST}:${PORT}`);
   initializeDatabase();
 });
 

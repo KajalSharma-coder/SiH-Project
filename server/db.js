@@ -269,18 +269,24 @@ export async function initDb() {
   await run(`CREATE INDEX IF NOT EXISTS demands_market_id_idx ON demands (market_id)`);
   await run(`CREATE INDEX IF NOT EXISTS deals_market_id_idx ON deals (market_id)`);
 
-  // Seed default demo users if users table is empty
+  // Seed default demo users if users table is empty.
+  // Set DEMO_USER_PASSWORD if seeded demo accounts are needed.
   const userCount = await get("SELECT COUNT(*) as count FROM users");
   if (Number(userCount.count) === 0) {
-    const hashedPassword = await bcrypt.hash("password123", 10);
-    await run(
-      `INSERT INTO users (id, role, name, identifier, password_hash) VALUES ($1, $2, $3, $4, $5)`,
-      ["F-101", "Farmer", "Ramesh Meena", "ramesh@fairtrade.org", hashedPassword]
-    );
-    await run(
-      `INSERT INTO users (id, role, name, identifier, password_hash) VALUES ($1, $2, $3, $4, $5)`,
-      ["B-101", "Buyer", "Shakti Foods Pvt Ltd", "shakti@fairtrade.org", hashedPassword]
-    );
+    const demoPassword = process.env.DEMO_USER_PASSWORD;
+    if (demoPassword) {
+      const hashedPassword = await bcrypt.hash(demoPassword, 10);
+      await run(
+        `INSERT INTO users (id, role, name, identifier, password_hash) VALUES ($1, $2, $3, $4, $5)`,
+        ["F-101", "Farmer", "Ramesh Meena", "ramesh@fairtrade.org", hashedPassword]
+      );
+      await run(
+        `INSERT INTO users (id, role, name, identifier, password_hash) VALUES ($1, $2, $3, $4, $5)`,
+        ["B-101", "Buyer", "Shakti Foods Pvt Ltd", "shakti@fairtrade.org", hashedPassword]
+      );
+    } else {
+      console.warn("Skipping demo user seed because DEMO_USER_PASSWORD is not set.");
+    }
   }
 
   // Seed any missing market quotes while preserving existing rows.

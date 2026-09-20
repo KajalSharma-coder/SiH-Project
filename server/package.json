@@ -5,7 +5,7 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "node dev.js",
+    "start": "node server.js",
     "start:raw": "node server.js",
     "dev": "node dev.js"
   },

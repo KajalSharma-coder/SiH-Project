@@ -1,12 +1,24 @@
 import type { ChatMessage, Deal, DealOffer, Demand, Lot, Market, MarketQuote, MatchScore, MLPredictionRequest, MLPredictionResponse } from "../types";
 
-const API_BASE = (import.meta as any).env?.VITE_API_URL || "http://localhost:5000/api";
+const DEV_API_BASE_URL = "http://localhost:5000/api";
+
+function getApiBaseUrl() {
+  const configuredUrl = import.meta.env.VITE_API_URL?.trim();
+  const apiBaseUrl = configuredUrl || (import.meta.env.DEV ? DEV_API_BASE_URL : "");
+  return apiBaseUrl.replace(/\/+$/, "");
+}
+
+const API_BASE_URL = getApiBaseUrl();
 
 function getToken(): string | null {
   return localStorage.getItem("fairtrade_token");
 }
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  if (!API_BASE_URL) {
+    throw new Error("VITE_API_URL is required for production API requests.");
+  }
+
   const token = getToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -20,12 +32,12 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   let response: Response;
 
   try {
-    response = await fetch(`${API_BASE}${endpoint}`, {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers,
     });
   } catch (error) {
-    throw new Error("Backend server is not running. Start it on port 5000 and try again.");
+    throw new Error("Backend server is unavailable. Check VITE_API_URL and try again.");
   }
 
   const data = await response.json();
