@@ -7,6 +7,7 @@ import { initDb, run, get, all, getDatabaseStatus } from "./db.js";
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || "fairtrade_sih_secret_key_2026";
+const ML_API_URL = process.env.ML_API_URL || "http://127.0.0.1:8001";
 const FRONTEND_ORIGINS = (process.env.FRONTEND_ORIGIN || "http://localhost:5173,http://127.0.0.1:5173")
   .split(",")
   .map((origin) => origin.trim())
@@ -270,6 +271,7 @@ const DEAL_SELECT = `
   SELECT
     d.*,
     COALESCE(m.id, l.market_id) AS market_id,
+    m.state AS market_state,
     COALESCE(m.name, l.mandi) AS market_name,
     COALESCE(m.city, l.city) AS market_city
   FROM deals d
@@ -303,6 +305,7 @@ function formatDeal(row) {
     buyerId: row.buyer_id,
     lotId: row.lot_id,
     marketId: row.market_id ? String(row.market_id) : undefined,
+    marketState: row.market_state || "",
     marketName: row.market_name || "",
     marketCity: row.market_city || "",
     crop: row.crop,
@@ -718,6 +721,86 @@ app.post("/api/quality/samples", authenticateToken, async (req, res) => {
     res.json({ sampleId, status: "Submitted", message: "Sample registered successfully for lab testing." });
   } catch (err) {
     res.status(500).json({ error: "Failed to register sample" });
+  }
+});
+
+async function callMlPrediction(payload) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Number(process.env.ML_API_TIMEOUT_MS) || 10000);
+
+  try {
+    const response = await fetch(`${ML_API_URL}/predict`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      const message = data.detail || data.error || "ML prediction service failed.";
+      const error = new Error(message);
+      error.status = response.status;
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    if (error.name === "AbortError") {
+      const timeoutError = new Error("ML prediction service timed out.");
+      timeoutError.status = 504;
+      throw timeoutError;
+    }
+
+    if (error.status) throw error;
+    const unavailable = new Error("ML prediction service is unavailable. Please start the FastAPI ML service.");
+    unavailable.status = 503;
+    throw unavailable;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function normalizePredictionPayload(source) {
+  const payload = {
+    crop: String(source.crop || "").trim(),
+    state: String(source.state || "").trim(),
+    district: String(source.district || source.city || "").trim(),
+    market: String(source.market || source.mandi || "").trim(),
+    prediction_days: Number(source.prediction_days || source.predictionDays || 7),
+  };
+
+  if (!payload.crop || !payload.state || !payload.district || !payload.market) {
+    const error = new Error("crop, state, district and market are required.");
+    error.status = 400;
+    throw error;
+  }
+
+  if (!Number.isFinite(payload.prediction_days) || payload.prediction_days < 1 || payload.prediction_days > 30) {
+    const error = new Error("prediction_days must be between 1 and 30.");
+    error.status = 400;
+    throw error;
+  }
+
+  payload.prediction_days = Math.round(payload.prediction_days);
+  return payload;
+}
+
+app.post("/api/ml/predict", async (req, res) => {
+  try {
+    const payload = normalizePredictionPayload(req.body || {});
+    res.json(await callMlPrediction(payload));
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message || "Failed to get ML prediction" });
+  }
+});
+
+app.get("/api/ml/predict", async (req, res) => {
+  try {
+    const payload = normalizePredictionPayload(req.query || {});
+    res.json(await callMlPrediction(payload));
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message || "Failed to get ML prediction" });
   }
 });
 

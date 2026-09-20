@@ -34,6 +34,34 @@ export type Market = {
   name: string;
 };
 
+export type MLPredictionRequest = {
+  crop: string;
+  state: string;
+  district: string;
+  market: string;
+  predictionDays: number;
+};
+
+export type MLPredictionPoint = {
+  date: string;
+  predictedPrice: number;
+  low: number;
+  high: number;
+  confidence: number;
+};
+
+export type MLPredictionResponse = {
+  crop: string;
+  state: string;
+  district: string;
+  market: string;
+  predictionDays: number;
+  currentPrice: number;
+  predictions: MLPredictionPoint[];
+  trainedAt?: string;
+  databaseWarning?: string | null;
+};
+
 export type Lot = {
   id: string;
   farmerId: string;
@@ -82,6 +110,7 @@ export type Deal = {
   buyerId: string;
   lotId: string;
   marketId?: string;
+  marketState: string;
   marketName: string;
   marketCity: string;
   crop: Crop;

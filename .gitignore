@@ -1,8 +1,15 @@
 node_modules/
 dist/
+.tmp-*/
 .env
 .env.*
 !.env.example
+*.joblib
+ml_service/artifacts/
+!ml_service/artifacts/
+!ml_service/artifacts/price_model.joblib
+__pycache__/
+*.py[cod]
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

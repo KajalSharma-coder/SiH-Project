@@ -1,12 +1,12 @@
-import { CheckCircle2, Download, FileText, Handshake, IndianRupee, MessageSquare, Printer, RefreshCcw, Send, XCircle } from "lucide-react";
+import { BarChart3, CheckCircle2, Download, FileText, Handshake, IndianRupee, MessageSquare, Printer, RefreshCcw, Send, XCircle } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Section, StatCard } from "../components/Cards";
 import { FairTradeLogo } from "../components/Logo";
-import { acceptDealOffer, getChatMessages, getDealById, getDealOffers, getDeals, markPaymentReceived, markPaymentSent, rejectDealOffer, sendChatMessage, sendCounterOffer, sendDealOffer } from "../services/api";
+import { acceptDealOffer, getChatMessages, getDealById, getDealOffers, getDeals, getMlPrediction, markPaymentReceived, markPaymentSent, rejectDealOffer, sendChatMessage, sendCounterOffer, sendDealOffer } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
-import type { ChatMessage, Deal, DealOffer } from "../types";
+import type { ChatMessage, Deal, DealOffer, MLPredictionResponse } from "../types";
 import { money, number } from "../utils/format";
 
 export function DealRoom() {
@@ -20,6 +20,9 @@ export function DealRoom() {
   const [sending, setSending] = useState(false);
   const [acting, setActing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [priceInsight, setPriceInsight] = useState<MLPredictionResponse | null>(null);
+  const [priceInsightLoading, setPriceInsightLoading] = useState(false);
+  const [priceInsightError, setPriceInsightError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -41,6 +44,38 @@ export function DealRoom() {
     }
     loadData();
   }, [id]);
+
+  useEffect(() => {
+    if (!deal || !deal.crop || !deal.marketState || !deal.marketCity || !deal.marketName) return;
+
+    let cancelled = false;
+    setPriceInsightLoading(true);
+    setPriceInsightError(null);
+
+    getMlPrediction({
+      crop: deal.crop,
+      state: deal.marketState,
+      district: deal.marketCity,
+      market: deal.marketName,
+      predictionDays: 7,
+    })
+      .then((prediction) => {
+        if (!cancelled) setPriceInsight(prediction);
+      })
+      .catch((err: any) => {
+        if (!cancelled) {
+          setPriceInsight(null);
+          setPriceInsightError(err.message || "AI fair price insight is unavailable right now.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPriceInsightLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [deal?.id, deal?.crop, deal?.marketState, deal?.marketCity, deal?.marketName]);
 
   if (loading) {
     return (
@@ -186,6 +221,13 @@ export function DealRoom() {
               ))}
             </div>
           </div>
+
+          <FairPriceInsight
+            currentOffer={currentPrice}
+            insight={priceInsight}
+            loading={priceInsightLoading}
+            error={priceInsightError}
+          />
 
           <div className="rounded-xl border border-[#D8CDBB] p-5 bg-[#F4EFE4]">
             <h3 className="text-lg font-extrabold text-[#33291F]">{t("deal.negotiation")}</h3>
@@ -456,6 +498,59 @@ export function Transactions() {
           </div>
         )}
       </Section>
+    </div>
+  );
+}
+
+function FairPriceInsight({ currentOffer, insight, loading, error }: { currentOffer: number; insight: MLPredictionResponse | null; loading: boolean; error: string | null }) {
+  const predictedPoint = insight?.predictions[0];
+  const predictedPrice = predictedPoint?.predictedPrice;
+  const difference = predictedPrice === undefined ? null : currentOffer - predictedPrice;
+
+  return (
+    <div className="rounded-xl border border-[#D8CDBB] bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="flex items-center gap-2 text-lg font-extrabold text-[#33291F]">
+            <BarChart3 size={19} className="text-[#B96832]" />
+            AI Fair Price Insight
+          </h3>
+          <p className="mt-1 text-xs font-semibold text-[#765536]">Informational only. Offers remain under buyer and farmer control.</p>
+        </div>
+        {loading && <span className="rounded-full bg-[#E9E1D2] px-3 py-1 text-xs font-bold text-[#765536]">Loading...</span>}
+      </div>
+
+      {error ? (
+        <p className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>
+      ) : (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <InsightMetric label="Current Market Price" value={insight ? `${money(insight.currentPrice)}/Qt` : loading ? "Checking..." : "-"} />
+          <InsightMetric label="AI Predicted Price" value={predictedPrice !== undefined ? `${money(predictedPrice)}/Qt` : loading ? "Checking..." : "-"} />
+          <InsightMetric label="Suggested Fair Price Range" value={predictedPoint ? `${money(predictedPoint.low)} - ${money(predictedPoint.high)}` : loading ? "Checking..." : "-"} />
+          <InsightMetric label="Current Deal Offer" value={`${money(currentOffer)}/Qt`} />
+          <InsightMetric
+            label="Offer vs Predicted"
+            value={difference === null ? "-" : `${difference >= 0 ? "+" : ""}${money(difference)}`}
+            tone={difference === null ? undefined : Math.abs(difference) < 1 ? "neutral" : difference > 0 ? "high" : "low"}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InsightMetric({ label, value, tone = "neutral" }: { label: string; value: string; tone?: "neutral" | "high" | "low" }) {
+  const toneClass =
+    tone === "high"
+      ? "text-[#555633]"
+      : tone === "low"
+        ? "text-[#B96832]"
+        : "text-[#33291F]";
+
+  return (
+    <div className="rounded-md border border-[#D8CDBB] bg-[#F4EFE4] p-3">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-[#765536]">{label}</p>
+      <p className={`mt-1 text-sm font-black ${toneClass}`}>{value}</p>
     </div>
   );
 }
