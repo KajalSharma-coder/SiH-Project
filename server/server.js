@@ -9,10 +9,12 @@ const PORT = Number(process.env.PORT) || 5000;
 const HOST = "0.0.0.0";
 const JWT_SECRET = process.env.JWT_SECRET;
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL;
+const PRODUCTION_FRONTEND_URL = "https://sihproject-eight-kappa.vercel.app";
 const FRONTEND_URLS = (process.env.FRONTEND_URL || "")
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
+const ALLOWED_FRONTEND_URLS = new Set([PRODUCTION_FRONTEND_URL, ...FRONTEND_URLS]);
 const isProduction = process.env.NODE_ENV === "production";
 
 if (isProduction && !JWT_SECRET) {
@@ -21,7 +23,7 @@ if (isProduction && !JWT_SECRET) {
 
 function isAllowedOrigin(origin) {
   if (!origin) return true;
-  if (FRONTEND_URLS.includes(origin)) return true;
+  if (ALLOWED_FRONTEND_URLS.has(origin)) return true;
 
   if (!isProduction) {
     try {
@@ -35,17 +37,23 @@ function isAllowedOrigin(origin) {
   return false;
 }
 
-app.use(cors({
+const corsOptions = {
   origin(origin, callback) {
     if (isAllowedOrigin(origin)) {
       callback(null, true);
       return;
     }
 
-    callback(new Error(`CORS blocked origin: ${origin}`));
+    callback(null, false);
   },
   credentials: true,
-}));
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 204,
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 app.use(express.json());
 
 app.get("/health", (req, res) => {
