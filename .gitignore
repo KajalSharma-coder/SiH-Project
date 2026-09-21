@@ -5,6 +5,7 @@ dist/
 .env.*
 !.env.example
 *.joblib
+!ml_service/artifacts/tanmay_price_model.joblib
 ml_service/artifacts/
 !ml_service/artifacts/
 !ml_service/artifacts/price_model.joblib

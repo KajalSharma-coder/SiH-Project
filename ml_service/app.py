@@ -42,7 +42,6 @@ def predict(payload: PredictionRequest):
         raise HTTPException(status_code=503, detail=str(error))
 
     fairtrade_history = None
-    db_error = None
     try:
         fairtrade_history = fetch_fairtrade_records(
             crop=payload.crop,
@@ -50,8 +49,8 @@ def predict(payload: PredictionRequest):
             district=payload.district,
             market=payload.market,
         )
-    except Exception as error:
-        db_error = str(error)
+    except Exception:
+        pass
 
     try:
         result = predict_future_prices(
@@ -68,15 +67,7 @@ def predict(payload: PredictionRequest):
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error))
 
-    return {
-        "crop": payload.crop,
-        "state": payload.state,
-        "district": payload.district,
-        "market": payload.market,
-        "prediction_days": payload.prediction_days,
-        "database_warning": db_error,
-        **result,
-    }
+    return result
 
 
 if __name__ == "__main__":
