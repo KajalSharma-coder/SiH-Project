@@ -2,7 +2,6 @@ import os
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
-import uvicorn
 
 from model import fetch_fairtrade_records, load_model_artifact, predict_future_prices
 
@@ -27,11 +26,7 @@ def get_artifact():
 
 @app.get("/health")
 def health():
-    try:
-        get_artifact()
-        return {"status": "ok", "model_loaded": True}
-    except FileNotFoundError:
-        return {"status": "ok", "model_loaded": False}
+    return {"status": "ok"}
 
 
 @app.post("/predict")
@@ -71,4 +66,6 @@ def predict(payload: PredictionRequest):
 
 
 if __name__ == "__main__":
-    uvicorn.run("app:app", host="0.0.0.0", port=int(os.getenv("PORT", "8001")))
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ["PORT"]))
