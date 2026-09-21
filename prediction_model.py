@@ -69,7 +69,7 @@ def get_fair_trade_data():
 
 if __name__ == "__main__":
     records = get_fair_trade_data()
-    print(json.dumps(records, indent=2, default=str))
+
 
 
 
@@ -150,7 +150,7 @@ if not fair_trade_df.empty:
     ]
     df = pd.concat([df, fair_trade_df.reindex(columns=matching_columns)], ignore_index=True)
 
-
+ 
 df['Arrival_Date'] = pd.to_datetime(df['Arrival_Date'], format='mixed', dayfirst=True)
 
 df['Min_Price'] = pd.to_numeric(df['Min_Price'], errors='coerce')
@@ -164,9 +164,13 @@ df['Day'] = df['Arrival_Date'].dt.day
 df['DayOfWeek'] = df['Arrival_Date'].dt.dayofweek
 df['WeekOfYear'] = df['Arrival_Date'].dt.isocalendar().week
 
+categorical_features = ['Commodity', 'District', 'Grade', 'Market', 'State', 'Variety']
+for column in categorical_features:
+    df[column] = df[column].fillna('Unknown').astype(str)
+
 
 # Identify categorical and numerical features
-categorical_features = ['Commodity', 'District', 'Grade', 'Market', 'State', 'Variety']
+# Identify numerical features
 numerical_features = ['Year', 'Month', 'Day', 'DayOfWeek', 'WeekOfYear']
 
 # Get all unique categories for each categorical feature from the full dataset
