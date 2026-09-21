@@ -1,4 +1,4 @@
-import { BarChart3, CheckCircle2, Download, FileText, Handshake, IndianRupee, MessageSquare, Printer, RefreshCcw, Send, XCircle } from "lucide-react";
+import { AlertCircle, BarChart3, CheckCircle2, Download, FileText, HandCoins, Handshake, IndianRupee, MessageSquare, Printer, RefreshCcw, Send, XCircle } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Section, StatCard } from "../components/Cards";
@@ -99,6 +99,7 @@ export function DealRoom() {
   const currentPrice = latestOffer?.pricePerUnit || deal.agreedPrice || deal.offer || deal.counterOffer;
   const currentQuantity = latestOffer?.quantity || deal.quantityQt;
   const total = currentPrice * currentQuantity;
+  const isCompleted = deal.status === "COMPLETED";
 
   async function reloadDeal() {
     const [dData, offerData] = await Promise.all([getDealById(deal!.id), getDealOffers(deal!.id)]);
@@ -181,12 +182,19 @@ export function DealRoom() {
             {t("deal.subtitle")}
           </p>
         </div>
-        <Link
-          to={`/bill/${deal.id}`}
-          className="inline-flex items-center gap-2 rounded-xl bg-[#B96832] px-5 py-3 text-sm font-bold text-white shadow-md transition hover:bg-[#9D5529]"
-        >
-          <FileText size={18} /> {t("deal.viewBill")}
-        </Link>
+        {isCompleted ? (
+          <Link
+            to={`/bill/${deal.id}`}
+            className="inline-flex items-center gap-2 rounded-xl bg-[#B96832] px-5 py-3 text-sm font-bold text-white shadow-md transition hover:bg-[#9D5529]"
+          >
+            <FileText size={18} /> {t("deal.viewBill")}
+          </Link>
+        ) : (
+          <div className="inline-flex max-w-sm items-center gap-2 rounded-xl border border-[#D8CDBB] bg-white px-4 py-3 text-sm font-bold text-[#765536]">
+            <AlertCircle size={18} className="shrink-0 text-[#B96832]" />
+            {t("deal.billLocked", { status: statusLabel(deal.status) })}
+          </div>
+        )}
       </div>
 
       {error && <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
@@ -230,7 +238,10 @@ export function DealRoom() {
           />
 
           <div className="rounded-xl border border-[#D8CDBB] p-5 bg-[#F4EFE4]">
-            <h3 className="text-lg font-extrabold text-[#33291F]">{t("deal.negotiation")}</h3>
+            <h3 className="flex items-center gap-2 text-lg font-extrabold text-[#33291F]">
+              <Handshake size={19} className="text-[#B96832]" />
+              {t("deal.negotiation")}
+            </h3>
             <div className="mt-4 space-y-3">
               {offers.length === 0 ? (
                 <p className="text-sm text-[#765536]">{t("deal.noOffers")}</p>
@@ -485,9 +496,15 @@ export function Transactions() {
                           <Link to={`/deal-room/${deal.id}`} className="inline-flex items-center gap-1 rounded-md bg-[#B96832] px-3 py-2 text-xs font-bold text-white hover:bg-[#9D5529]">
                             <Handshake size={14} /> {t("transactions.openDeal")}
                           </Link>
-                          <Link to={`/bill/${deal.id}`} className="inline-flex items-center gap-1 rounded-md border border-[#D8CDBB] px-3 py-2 text-xs font-bold text-[#765536] hover:border-[#B96832]/60">
-                            <FileText size={14} /> {t("transactions.bill")}
-                          </Link>
+                          {deal.status === "COMPLETED" ? (
+                            <Link to={`/bill/${deal.id}`} className="inline-flex items-center gap-1 rounded-md border border-[#D8CDBB] px-3 py-2 text-xs font-bold text-[#765536] hover:border-[#B96832]/60">
+                              <FileText size={14} /> {t("transactions.bill")}
+                            </Link>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-md border border-[#D8CDBB] bg-[#F4EFE4] px-3 py-2 text-xs font-bold text-[#765536]">
+                              <AlertCircle size={14} /> {statusLabel(deal.status)}
+                            </span>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -559,59 +576,113 @@ export function Bill() {
   const { id = "DL-9002" } = useParams();
   const { t, statusLabel, paymentLabel } = useI18n();
   const [deal, setDeal] = useState<Deal | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getDealById(id)
       .then(setDeal)
-      .catch(() => getDeals().then((all) => setDeal(all[0])));
+      .catch((err: any) => setError(err.message || t("deal.notFound")));
   }, [id]);
 
   if (!deal) {
-    return <div className="py-12 text-center text-xs text-[#765536]">{t("bill.loading")}</div>;
+    return <div className="py-12 text-center text-xs text-[#765536]">{error || t("bill.loading")}</div>;
   }
 
   const total = deal.agreedPrice * deal.quantityQt;
+  const isCompleted = deal.status === "COMPLETED";
+  const issuedAt = deal.updatedAt
+    ? new Date(deal.updatedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
+    : deal.date;
 
-  function downloadBill() {
-    const content = `FAIRTRADE DIGITAL BILL / INVOICE\n-----------------------------------\n${t("bill.reference")}: ${deal!.id}\n${t("common.date")}: ${deal!.date}\n${t("bill.transactionOption")}: ${deal!.transactionMode}\n${t("bill.farmerSeller")}: ${deal!.farmer}\n${t("common.buyer")}: ${deal!.buyer}\n${t("bill.cropLot")}: ${deal!.crop} (${deal!.lotId})\n${t("common.mandi")}: ${deal!.marketName}${deal!.marketCity ? `, ${deal!.marketCity}` : ""}\n${t("common.quantity")}: ${deal!.quantityQt} ${t("common.quintal")}\n${t("deal.qualityGrade")}: ${deal!.grade}\n${t("deal.agreedRate")}: ${deal!.agreedPrice} / Qt\n${t("common.totalAmount")}: ${total}\n${t("deal.paymentStatus")}: ${statusLabel(deal!.status)}\n${t("bill.paymentGivenStatus")}: ${deal!.paymentGiven ? t("common.confirmed") : t("common.pending")}\n${t("bill.paymentReceivedStatus")}: ${deal!.paymentReceived ? t("common.confirmed") : t("common.pending")}\n`;
-    const blob = new Blob([content], { type: "text/plain" });
+  function printBill() {
+    window.print();
+  }
+
+  function downloadPdf() {
+    if (!isCompleted) return;
+    const values = getBillValues(deal!, {
+      issuedAt,
+      status: statusLabel(deal!.status),
+      paymentStatus: paymentLabel(deal!.paymentStatus),
+      total: pdfMoney(total),
+      startingPrice: `${pdfMoney(deal!.offer)} / ${t("common.quintal")}`,
+      finalPrice: `${pdfMoney(deal!.agreedPrice)} / ${t("common.quintal")}`,
+      quantity: `${number(deal!.quantityQt)} ${t("common.quintal")}`,
+    });
+    const blob = createDigitalBillPdf(values);
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${deal!.id}-fairtrade-bill.txt`;
+    link.download = `${deal!.id}-digital-bill.pdf`;
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(url);
+    link.remove();
+    window.setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 1000);
+  }
+
+  if (!isCompleted) {
+    return (
+      <div className="mx-auto max-w-3xl rounded-2xl border border-[#D8CDBB] bg-white p-8 shadow-soft">
+        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#D8CDBB] pb-5">
+          <FairTradeLogo size="sm" clickable={false} />
+          <span className={`rounded-xl px-4 py-2 text-xs font-black ${statusClass(deal.status)}`}>
+            {statusLabel(deal.status)}
+          </span>
+        </div>
+        <div className="mt-6 rounded-xl border border-[#D8CDBB] bg-[#F4EFE4] p-5">
+          <h1 className="flex items-center gap-2 text-2xl font-black text-[#33291F]">
+            <AlertCircle size={22} className="text-[#B96832]" />
+            {t("bill.notReadyTitle")}
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-[#765536]">
+            {t("bill.notReadyDetail", { status: statusLabel(deal.status) })}
+          </p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <BillRow label={t("bill.reference")} value={deal.id} />
+            <BillRow label={t("deal.dealStatus")} value={statusLabel(deal.status)} />
+            <BillRow label={t("deal.paymentStatus")} value={paymentLabel(deal.paymentStatus)} />
+            <BillRow label={t("deal.cropAndLot")} value={`${deal.crop} - ${deal.lotId}`} />
+          </div>
+          <Link to={`/deal-room/${deal.id}`} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#B96832] px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-[#9D5529]">
+            <HandCoins size={17} /> {t("transactions.openDeal")}
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="rounded-2xl border border-[#D8CDBB] bg-white p-8 shadow-soft max-w-4xl mx-auto space-y-6">
+    <div className="mx-auto max-w-5xl space-y-4">
       {/* Controls */}
-      <div className="no-print flex flex-wrap justify-between items-center border-b border-[#D8CDBB] pb-4">
+      <div className="no-print flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#D8CDBB] bg-white p-4 shadow-soft">
         <FairTradeLogo size="sm" clickable={false} />
         <div className="flex gap-2">
           <button
-            onClick={() => window.print()}
+            onClick={printBill}
             className="inline-flex items-center gap-2 rounded-xl border border-[#555633] px-4 py-2.5 text-xs font-bold text-[#555633] hover:bg-[#E9E1D2]"
           >
             <Printer size={16} /> {t("bill.printInvoice")}
           </button>
           <button
-            onClick={downloadBill}
+            onClick={downloadPdf}
             className="inline-flex items-center gap-2 rounded-xl bg-[#B96832] px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#9D5529]"
           >
-            <Download size={16} /> {t("bill.downloadTxt")}
+            <Download size={16} /> {t("bill.downloadPdf")}
           </button>
         </div>
       </div>
 
       {/* Bill Body */}
-      <div>
-        <div className="flex justify-between items-start">
+      <div id="digital-bill" className="a4-bill rounded-2xl border border-[#D8CDBB] bg-white p-8 shadow-soft">
+        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#D8CDBB] pb-6">
           <div>
+            <FairTradeLogo size="sm" clickable={false} />
             <p className="text-xs font-bold text-[#33291F] uppercase tracking-wider">{t("bill.record")}</p>
-            <h1 className="text-3xl font-black text-[#33291F] mt-1">{t("bill.invoice", { id: deal.id })}</h1>
+            <h1 className="text-3xl font-black text-[#33291F] mt-1">{t("bill.title")}</h1>
             <p className="text-xs text-[#765536] mt-1">
-              {t("bill.issued")}: {deal.date} | {t("bill.mode")}: <b>{deal.transactionMode}</b>
+              {t("bill.reference")}: <b>{deal.id}</b> | {t("bill.issued")}: {issuedAt}
             </p>
           </div>
           <span className={`rounded-xl px-4 py-2 text-xs font-black ${statusClass(deal.status)}`}>
@@ -620,28 +691,211 @@ export function Bill() {
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <BillRow label={t("bill.buyerId")} value={deal.buyerId} />
+          <BillRow label={t("bill.sellerId")} value={deal.farmerId} />
           <BillRow label={t("bill.sellerFarmer")} value={deal.farmer} />
           <BillRow label={t("common.buyer")} value={deal.buyer} />
+          <BillRow label={t("bill.dealId")} value={deal.id} />
           <BillRow label={t("deal.cropAndLot")} value={`${deal.crop} - ${deal.lotId}`} />
-          <BillRow label={t("common.mandi")} value={deal.marketCity ? `${deal.marketName}, ${deal.marketCity}` : deal.marketName} />
+          <BillRow label={t("common.mandi")} value={[deal.marketName, deal.marketCity, deal.marketState].filter(Boolean).join(", ")} />
           <BillRow label={t("deal.qualityGrade")} value={deal.grade} />
           <BillRow label={t("common.quantity")} value={`${number(deal.quantityQt)} ${t("common.quintal")}`} />
-          <BillRow label={t("deal.agreedRate")} value={`${money(deal.agreedPrice)} / ${t("common.quintal")}`} />
-
-          {deal.transactionMode === "Use FairTrade" && (
-            <>
-              <BillRow label={t("bill.paymentGivenStatus")} value={deal.paymentGiven ? t("common.confirmed") : paymentLabel("PENDING")} />
-              <BillRow label={t("bill.paymentReceivedStatus")} value={deal.paymentReceived ? t("common.confirmed") : paymentLabel("PENDING")} />
-            </>
-          )}
-
+          <BillRow label={t("bill.startingPrice")} value={`${money(deal.offer)} / ${t("common.quintal")}`} />
+          <BillRow label={t("bill.finalPrice")} value={`${money(deal.agreedPrice)} / ${t("common.quintal")}`} />
+          <BillRow label={t("bill.transactionOption")} value={deal.transactionMode} />
+          <BillRow label={t("deal.paymentStatus")} value={paymentLabel(deal.paymentStatus)} />
+          <BillRow label={t("bill.paymentGivenStatus")} value={deal.paymentGiven ? t("common.confirmed") : paymentLabel("PENDING")} />
+          <BillRow label={t("bill.paymentReceivedStatus")} value={deal.paymentReceived ? t("common.confirmed") : paymentLabel("PENDING")} />
           <div className="md:col-span-2">
             <BillRow label={t("common.totalAmount")} value={money(total)} strong />
           </div>
         </div>
+
+        <div className="mt-6 rounded-xl border border-[#D8CDBB] bg-[#F4EFE4] p-4 text-xs leading-6 text-[#765536]">
+          <b className="text-[#33291F]">{t("bill.completionStatus")}:</b> {statusLabel(deal.status)}. {t("bill.actualDataNote")}
+        </div>
       </div>
     </div>
   );
+}
+
+function getBillValues(deal: Deal, values: { issuedAt: string; status: string; paymentStatus: string; total: string; startingPrice: string; finalPrice: string; quantity: string }) {
+  const market = [deal.marketName, deal.marketCity, deal.marketState].filter(Boolean).join(", ");
+  const rows = [
+    ["Buyer ID", deal.buyerId],
+    ["Seller ID", deal.farmerId],
+    ["Deal ID", deal.id],
+    ["Buyer", deal.buyer],
+    ["Seller", deal.farmer],
+    ["Crop / Commodity", deal.crop],
+    ["Lot ID", deal.lotId],
+    ["Quantity", values.quantity],
+    ["Grade", deal.grade],
+    ["Starting Price", values.startingPrice],
+    ["Negotiated / Final Price", values.finalPrice],
+    ["Market / Mandi", market],
+    ["Transaction Mode", deal.transactionMode],
+    ["Payment Status", values.paymentStatus],
+    ["Date / Time", values.issuedAt],
+    ["Deal Completion Status", values.status],
+  ];
+
+  return {
+    dealId: deal.id,
+    issuedAt: values.issuedAt,
+    status: values.status,
+    total: values.total,
+    rows,
+  };
+}
+
+function pdfMoney(value: number) {
+  return `Rs ${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(value)}`;
+}
+
+function createDigitalBillPdf(values: ReturnType<typeof getBillValues>) {
+  const pageWidth = 595.28;
+  const pageHeight = 841.89;
+  const margin = 46;
+  const rowLabelWidth = 160;
+  const rowValueWidth = pageWidth - margin * 2 - rowLabelWidth;
+  const pages: string[] = [];
+  let commands: string[] = [];
+  let y = pageHeight - margin;
+
+  function addPage() {
+    if (commands.length) pages.push(commands.join("\n"));
+    commands = [];
+    y = pageHeight - margin;
+    rect(margin, margin, pageWidth - margin * 2, pageHeight - margin * 2, "1 1 1 rg", true);
+  }
+
+  function lineColor(color: string) {
+    commands.push(`${color} RG`);
+  }
+
+  function fillColor(color: string) {
+    commands.push(`${color} rg`);
+  }
+
+  function rect(x: number, topY: number, width: number, height: number, color: string, fill = false) {
+    fillColor(color);
+    commands.push(`${x} ${pageHeight - topY - height} ${width} ${height} re ${fill ? "f" : "S"}`);
+  }
+
+  function text(value: string, x: number, topY: number, size: number, color = "0.2 0.16 0.12 rg", font = "F1") {
+    fillColor(color);
+    commands.push(`BT /${font} ${size} Tf ${x} ${pageHeight - topY - size} Td (${escapePdfText(value)}) Tj ET`);
+  }
+
+  function wrap(value: string, maxChars: number) {
+    const words = String(value || "-").split(/\s+/);
+    const lines: string[] = [];
+    let line = "";
+
+    for (const word of words) {
+      if ((line ? `${line} ${word}` : word).length <= maxChars) {
+        line = line ? `${line} ${word}` : word;
+      } else {
+        if (line) lines.push(line);
+        if (word.length > maxChars) {
+          for (let index = 0; index < word.length; index += maxChars) lines.push(word.slice(index, index + maxChars));
+          line = "";
+        } else {
+          line = word;
+        }
+      }
+    }
+
+    if (line) lines.push(line);
+    return lines.length ? lines : ["-"];
+  }
+
+  function drawHeader() {
+    rect(margin, margin, 54, 54, "0.73 0.41 0.20 rg", true);
+    text("FT", margin + 15, margin + 18, 18, "1 1 1 rg", "F2");
+    text("FairTrade", margin + 68, margin + 4, 24, "0.2 0.16 0.12 rg", "F2");
+    text("Trusted Mandi Platform", margin + 68, margin + 32, 10, "0.46 0.33 0.21 rg");
+    text("Digital Bill", margin, margin + 74, 28, "0.2 0.16 0.12 rg", "F2");
+    text(`Bill Reference: ${values.dealId} | Issued: ${values.issuedAt}`, margin, margin + 108, 10, "0.46 0.33 0.21 rg");
+    rect(pageWidth - margin - 112, margin + 8, 112, 28, "0.91 0.88 0.82 rg", true);
+    text(values.status, pageWidth - margin - 100, margin + 17, 10, "0.2 0.16 0.12 rg", "F2");
+    lineColor("0.85 0.8 0.73");
+    commands.push(`${margin} ${pageHeight - margin - 128} m ${pageWidth - margin} ${pageHeight - margin - 128} l S`);
+    y = margin + 150;
+  }
+
+  function drawRow(label: string, value: string) {
+    const valueLines = wrap(value, 52);
+    const labelLines = wrap(label, 24);
+    const rowHeight = Math.max(34, 18 + Math.max(valueLines.length, labelLines.length) * 13);
+
+    if (y + rowHeight > pageHeight - margin - 80) {
+      addPage();
+      drawHeader();
+    }
+
+    rect(margin, y, rowLabelWidth, rowHeight, "0.96 0.94 0.89 rg", true);
+    lineColor("0.85 0.8 0.73");
+    commands.push(`${margin} ${pageHeight - y - rowHeight} ${rowLabelWidth} ${rowHeight} re S`);
+    commands.push(`${margin + rowLabelWidth} ${pageHeight - y - rowHeight} ${rowValueWidth} ${rowHeight} re S`);
+    labelLines.forEach((line, index) => text(line, margin + 12, y + 12 + index * 13, 10, "0.46 0.33 0.21 rg", "F2"));
+    valueLines.forEach((line, index) => text(line, margin + rowLabelWidth + 12, y + 12 + index * 13, 11, "0.2 0.16 0.12 rg", "F2"));
+    y += rowHeight;
+  }
+
+  addPage();
+  drawHeader();
+  values.rows.forEach(([label, value]) => drawRow(label, String(value || "-")));
+  y += 18;
+  rect(margin, y, pageWidth - margin * 2, 42, "0.91 0.88 0.82 rg", true);
+  text("Total Transaction Amount", margin + 14, y + 15, 12, "0.2 0.16 0.12 rg", "F2");
+  text(values.total, pageWidth - margin - 150, y + 15, 14, "0.2 0.16 0.12 rg", "F2");
+  y += 58;
+  text("This Digital Bill is generated only after deal completion and uses the completed deal values recorded in FairTrade.", margin, y, 9, "0.46 0.33 0.21 rg");
+  pages.push(commands.join("\n"));
+
+  return new Blob([buildPdfDocument(pages)], { type: "application/pdf" });
+}
+
+function buildPdfDocument(pageStreams: string[]) {
+  const objects: string[] = [];
+  const fontId = 3;
+  const pageRefs = pageStreams.map((_, index) => `${4 + index * 2} 0 R`).join(" ");
+
+  objects[0] = "<< /Type /Catalog /Pages 2 0 R >>";
+  objects[1] = `<< /Type /Pages /Kids [${pageRefs}] /Count ${pageStreams.length} >>`;
+  objects[2] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>";
+
+  pageStreams.forEach((stream, index) => {
+    const pageObjectId = 4 + index * 2;
+    const contentObjectId = pageObjectId + 1;
+    objects[pageObjectId - 1] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 ${fontId} 0 R /F2 ${fontId} 0 R >> >> /Contents ${contentObjectId} 0 R >>`;
+    objects[contentObjectId - 1] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
+  });
+
+  let output = "%PDF-1.4\n";
+  const offsets: number[] = [0];
+  objects.forEach((object, index) => {
+    offsets[index + 1] = output.length;
+    output += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xrefStart = output.length;
+  output += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach((offset) => {
+    output += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  });
+  output += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
+  return output;
+}
+
+function escapePdfText(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[^\x20-\x7E]/g, "")
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)");
 }
 
 function BillRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {

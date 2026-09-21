@@ -1,4 +1,4 @@
-import { Filter, HandCoins, Package, Search } from "lucide-react";
+import { Filter, HandCoins, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -6,6 +6,7 @@ import { useI18n } from "../context/I18nContext";
 import { getDemands, getLots, startDeal } from "../services/api";
 import type { Demand, Lot } from "../types";
 import { money } from "../utils/format";
+import { MarketSymbol } from "../components/MarketSymbol";
 
 const inputClass = "rounded-md border border-[#D8CDBB] bg-white px-3 py-2 text-sm outline-none focus:border-[#B96832] focus:ring-2 focus:ring-[#B96832]/15";
 
@@ -131,12 +132,11 @@ function LotMarketCard({ lot }: { lot: Lot }) {
     <article className="rounded-md border border-[#D8CDBB] bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex gap-3">
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-[#E9E1D2] text-[#B96832]">
-            <Package size={22} />
-          </span>
+          <MarketSymbol size="lg" />
           <div>
             <h2 className="font-black">{lot.crop}</h2>
             <p className="text-sm text-[#765536]">{lot.mandi}, {lot.city}</p>
+            <p className="mt-1 text-xs font-bold text-[#B96832]">Live market price reference</p>
             <p className="mt-2 text-xs text-[#765536]">{t("market.farmerReliability")}: <b>{lot.reliability}%</b></p>
           </div>
         </div>

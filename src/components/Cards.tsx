@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
-export function StatCard({ label, value, helper, icon: Icon }: { label: string; value: string; helper?: string; icon: LucideIcon }) {
+export function StatCard({ label, value, helper, icon: Icon, symbol }: { label: string; value: string; helper?: string; icon: LucideIcon; symbol?: ReactNode }) {
   return (
     <div className="rounded-md border border-[#D8CDBB] bg-white p-4 shadow-soft">
       <div className="flex items-start justify-between gap-3">
@@ -9,7 +10,7 @@ export function StatCard({ label, value, helper, icon: Icon }: { label: string; 
           <p className="mt-2 text-2xl font-black tracking-tight text-ink">{value}</p>
           {helper && <p className="mt-1 text-xs text-[#765536]">{helper}</p>}
         </div>
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-[#E9E1D2] text-[#B96832]"><Icon size={20} /></span>
+        {symbol ?? <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-[#E9E1D2] text-[#B96832]"><Icon size={20} /></span>}
       </div>
     </div>
   );

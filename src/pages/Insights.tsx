@@ -1,8 +1,9 @@
-import { ArrowDownRight, ArrowUpRight, BarChart3, CalendarDays, TrendingUp } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, BarChart3, CalendarDays, Package } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ForecastChart } from "../components/ForecastChart";
 import { MarketSelector } from "../components/MarketSelector";
 import { StatCard } from "../components/Cards";
+import { MarketSymbol } from "../components/MarketSymbol";
 import { useI18n } from "../context/I18nContext";
 import { getMarketQuotes, getMlPrediction } from "../services/api";
 import type { ForecastPoint, MarketQuote, MLPredictionResponse } from "../types";
@@ -192,7 +193,10 @@ export function PricePrediction() {
         {mlPrediction && (
           <div className="mt-5 grid gap-4 lg:grid-cols-[260px_1fr]">
             <div className="rounded-md bg-[#F4EFE4] p-4">
-              <p className="text-xs font-bold uppercase tracking-wide text-[#765536]">Current Price</p>
+              <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[#765536]">
+                <Package size={15} className="text-[#B96832]" />
+                Current Price
+              </p>
               <p className="mt-2 text-2xl font-black text-[#33291F]">{money(mlPrediction.currentPrice)}/qt</p>
               <p className="mt-2 text-sm text-[#765536]">{mlPrediction.crop} at {mlPrediction.market}</p>
               <p className="mt-4 text-xs font-bold uppercase tracking-wide text-[#765536]">Price Trend</p>
@@ -226,7 +230,7 @@ export function PricePrediction() {
       </section>
 
       <div className="grid gap-3 md:grid-cols-3">
-        <StatCard label={t("price.currentPrice")} value={`${money(currentPrice)}/qt`} helper={`${quote.crop} at ${quote.mandi}`} icon={TrendingUp} />
+        <StatCard label={t("price.currentPrice")} value={`${money(currentPrice)}/qt`} helper={`${quote.crop} at ${quote.mandi}`} icon={Package} symbol={<MarketSymbol />} />
         <StatCard label={t("price.predictedPrice")} value={`${money(predicted)}/qt`} helper={mlLoading ? "Loading ML..." : period} icon={BarChart3} />
         <StatCard label={t("price.expectedChange")} value={`${change >= 0 ? "+" : ""}${money(change)} (${changePercent.toFixed(1)}%)`} helper={t("price.estimateOnly")} icon={ChangeIcon} />
       </div>

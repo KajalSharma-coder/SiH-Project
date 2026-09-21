@@ -91,7 +91,7 @@ export function FarmerDashboard() {
         </div>
       </Section>
 
-      <Section title={t("dashboard.myDealRequests")} subtitle={t("dashboard.myDealRequestsSubtitle")}>
+      <Section title={t("dashboard.quotation")} subtitle={t("dashboard.quotationSubtitle")}>
         <DealRequests deals={myDeals} />
       </Section>
     </div>
@@ -179,12 +179,12 @@ export function QualityPassport() {
       <PageHeader title={t("quality.title")} subtitle={t("quality.subtitle")} />
       {message && <div className="rounded-md border border-[#D8CDBB] bg-[#E9E1D2] p-3 text-sm font-bold text-[#B96832]">{message}</div>}
       <div className="grid gap-3 md:grid-cols-2">
-        {lots.map((lot, index) => (
+        {lots.map((lot) => (
           <article key={lot.id} className="rounded-md border border-[#D8CDBB] bg-white p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-black">FT-SMP-{2026 + index}</p>
-                <p className="text-sm text-[#765536]">{lot.crop} / {lot.id}</p>
+                <p className="font-black">{lot.id}</p>
+                <p className="text-sm text-[#765536]">{lot.crop} / {lot.farmerId}</p>
               </div>
               <span className="rounded-full bg-[#E9E1D2] px-3 py-1 text-xs font-bold text-[#B96832]">{lot.labStatus}</span>
             </div>
@@ -276,7 +276,7 @@ function DealRequests({ deals }: { deals: Deal[] }) {
             <th className="p-4">{t("common.buyer")}</th>
             <th className="p-4">{t("common.produce")}</th>
             <th className="p-4">{t("common.quantity")}</th>
-            <th className="p-4">{t("dashboard.offerPrice")}</th>
+            <th className="p-4">{t("dashboard.quotation")}</th>
             <th className="p-4">{t("common.status")}</th>
             <th className="p-4">{t("common.action")}</th>
           </tr>
@@ -289,9 +289,13 @@ function DealRequests({ deals }: { deals: Deal[] }) {
                 {deal.crop}
                 <span className="block text-xs text-[#765536]">{deal.lotId}</span>
                 {deal.marketName && <span className="block text-xs text-[#765536]">{deal.marketName}</span>}
+                <span className="block text-xs text-[#765536]">{t("deal.qualityGrade")}: {deal.grade}</span>
               </td>
               <td className="p-4">{deal.quantityQt} qt</td>
-              <td className="p-4 font-bold text-[#33291F]">{money(deal.offer || deal.agreedPrice)}/qt</td>
+              <td className="p-4">
+                <span className="block font-bold text-[#33291F]">{money(deal.offer || deal.agreedPrice)}/qt</span>
+                <span className="mt-1 block text-xs text-[#765536]">{t("common.date")}: {deal.date}</span>
+              </td>
               <td className="p-4"><span className="rounded-full bg-[#E9E1D2] px-3 py-1 text-xs font-bold text-[#B96832]">{statusLabel(deal.status)}</span></td>
               <td className="p-4"><Link to={`/deal-room/${deal.id}`} className="text-xs font-bold text-[#B96832] hover:underline">{t("transactions.openDeal")}</Link></td>
             </tr>
