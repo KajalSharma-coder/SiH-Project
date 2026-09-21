@@ -756,6 +756,7 @@ app.post("/api/quality/samples", authenticateToken, async (req, res) => {
 async function callMlPrediction(payload) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), Number(process.env.ML_API_TIMEOUT_MS) || 10000);
+  const targetUrl = ML_SERVICE_URL ? `${ML_SERVICE_URL.replace(/\/+$/, "")}/predict` : "";
 
   try {
     if (!ML_SERVICE_URL) {
@@ -764,16 +765,24 @@ async function callMlPrediction(payload) {
       throw configError;
     }
 
-    const response = await fetch(`${ML_SERVICE_URL}/predict`, {
+    const response = await fetch(targetUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
-    const data = await response.json().catch(() => ({}));
+    const responseBody = await response.text();
+    const data = parseJsonResponseBody(responseBody);
 
     if (!response.ok) {
       const message = data.detail || data.error || "ML prediction service failed.";
+      logMlPredictionFailure({
+        targetUrl,
+        status: response.status,
+        responseBody,
+        requestBody: payload,
+        message,
+      });
       const error = new Error(message);
       error.status = response.status;
       throw error;
@@ -782,18 +791,57 @@ async function callMlPrediction(payload) {
     return data;
   } catch (error) {
     if (error.name === "AbortError") {
+      logMlPredictionFailure({
+        targetUrl,
+        requestBody: payload,
+        message: "ML prediction service timed out.",
+        fetchError: error.message,
+      });
       const timeoutError = new Error("ML prediction service timed out.");
       timeoutError.status = 504;
       throw timeoutError;
     }
 
     if (error.status) throw error;
+    logMlPredictionFailure({
+      targetUrl,
+      requestBody: payload,
+      message: "ML prediction service is unavailable.",
+      fetchError: error.message,
+    });
     const unavailable = new Error("ML prediction service is unavailable. Please start the FastAPI ML service.");
     unavailable.status = 503;
     throw unavailable;
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function parseJsonResponseBody(responseBody) {
+  if (!responseBody) return {};
+
+  try {
+    return JSON.parse(responseBody);
+  } catch {
+    return {};
+  }
+}
+
+function truncateForLog(value, maxLength = 2000) {
+  const text = typeof value === "string" ? value : JSON.stringify(value);
+  if (!text) return "";
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+}
+
+function logMlPredictionFailure({ targetUrl, status, responseBody, requestBody, message, fetchError }) {
+  console.error("ML prediction request failed", {
+    targetUrl,
+    status: status || null,
+    responseBody: responseBody ? truncateForLog(responseBody) : null,
+    requestBody,
+    message,
+    fetchError: fetchError || null,
+  });
 }
 
 function normalizePredictionPayload(source) {
