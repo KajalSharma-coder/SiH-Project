@@ -602,21 +602,11 @@ export function Bill() {
     window.print();
   }
 
-  function downloadPdf() {
+  async function downloadPdf() {
     if (!isCompleted) return;
-    const values = getBillValues(deal!, {
-      issuedAt,
-      status: statusLabel(deal!.status),
-      buyerPaymentStatus,
-      sellerPaymentStatus,
-      paymentReference,
-      total: pdfMoney(total),
-      startingPrice: `${pdfMoney(deal!.offer)} / ${t("common.quintal")}`,
-      negotiation: `${pdfMoney(deal!.counterOffer)} / ${t("common.quintal")}`,
-      finalPrice: `${pdfMoney(deal!.agreedPrice)} / ${t("common.quintal")}`,
-      quantity: `${number(deal!.quantityQt)} ${t("common.quintal")}`,
-    });
-    const blob = createDigitalBillPdf(values);
+    const billElement = document.getElementById("digital-bill");
+    if (!billElement) return;
+    const blob = await createDigitalBillPdf(billElement);
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -746,44 +736,6 @@ export function Bill() {
   );
 }
 
-function getBillValues(deal: Deal, values: { issuedAt: string; status: string; buyerPaymentStatus: string; sellerPaymentStatus: string; paymentReference: string; total: string; startingPrice: string; negotiation: string; finalPrice: string; quantity: string }) {
-  const market = formatMarketLocation(deal);
-  const rows = [
-    ["Date", values.issuedAt],
-    ["Mandi Name / Where the deal is made", market],
-    ["Buyer ID", deal.buyerId],
-    ["Buyer Name", deal.buyer],
-    ["Seller ID", deal.farmerId],
-    ["Seller Name", deal.farmer],
-    ["Deal ID", deal.id],
-    ["Shop / Deal Location", market],
-    ["Crop (Lot ID)", `${deal.crop} (${deal.lotId})`],
-    ["Quantity", values.quantity],
-    ["Grade", deal.grade],
-    ["Starting Price", values.startingPrice],
-    ["Negotiation", values.negotiation],
-    ["Final Price", values.finalPrice],
-    ["Transaction Mode", deal.transactionMode],
-    ["FairTrade Transactions", deal.transactionMode === "Use FairTrade" ? values.status : deal.transactionMode],
-    ["Payment Status - Seller", values.sellerPaymentStatus],
-    ["Payment Status - Buyer", values.buyerPaymentStatus],
-    ["UPI ID / Transaction ID", values.paymentReference],
-    ["Deal Completion Status", values.status],
-  ];
-
-  return {
-    dealId: deal.id,
-    issuedAt: values.issuedAt,
-    status: values.status,
-    total: values.total,
-    rows,
-  };
-}
-
-function pdfMoney(value: number) {
-  return `Rs ${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(value)}`;
-}
-
 function formatMarketLocation(deal: Deal) {
   return [deal.marketName, deal.marketCity, deal.marketState].filter(Boolean).join(", ") || "-";
 }
@@ -792,149 +744,214 @@ function getPaymentReference(deal: Deal) {
   return deal.paymentGiven || deal.paymentReceived ? "Not recorded in payment data" : "-";
 }
 
-function createDigitalBillPdf(values: ReturnType<typeof getBillValues>) {
+async function createDigitalBillPdf(sourceElement: HTMLElement) {
+  const jpegDataUrl = await renderBillElementToJpeg(sourceElement);
+  return createA4ImagePdf(jpegDataUrl);
+}
+
+async function renderBillElementToJpeg(sourceElement: HTMLElement) {
+  await document.fonts?.ready;
+
+  const rect = sourceElement.getBoundingClientRect();
+  const width = Math.ceil(rect.width);
+  const height = Math.ceil(sourceElement.scrollHeight || rect.height);
+  const clone = sourceElement.cloneNode(true) as HTMLElement;
+
+  await inlineImageSources(clone);
+  inlineComputedStyles(sourceElement, clone);
+
+  clone.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+  clone.style.width = `${width}px`;
+  clone.style.height = `${height}px`;
+  clone.style.margin = "0";
+  clone.style.boxSizing = "border-box";
+  clone.style.boxShadow = "none";
+
+  const serialized = new XMLSerializer().serializeToString(clone);
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+      <foreignObject width="100%" height="100%">
+        ${serialized}
+      </foreignObject>
+    </svg>
+  `;
+  const svgUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
+
+  try {
+    const image = await loadImage(svgUrl);
+    const scale = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(width * scale);
+    canvas.height = Math.round(height * scale);
+
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Unable to create PDF canvas context.");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    return canvas.toDataURL("image/jpeg", 0.95);
+  } finally {
+    URL.revokeObjectURL(svgUrl);
+  }
+}
+
+async function inlineImageSources(root: HTMLElement) {
+  const images = Array.from(root.querySelectorAll("img"));
+
+  await Promise.all(images.map(async (image) => {
+    const source = image.getAttribute("src");
+    if (!source || source.startsWith("data:")) return;
+
+    const response = await fetch(source);
+    const blob = await response.blob();
+    const dataUrl = await blobToDataUrl(blob);
+    image.setAttribute("src", dataUrl);
+  }));
+}
+
+function inlineComputedStyles(source: Element, clone: Element) {
+  if (source instanceof HTMLElement && clone instanceof HTMLElement) {
+    const computedStyle = window.getComputedStyle(source);
+    clone.setAttribute("style", computedStyleToText(computedStyle));
+  }
+
+  const sourceChildren = Array.from(source.children);
+  const cloneChildren = Array.from(clone.children);
+  sourceChildren.forEach((child, index) => {
+    const childClone = cloneChildren[index];
+    if (childClone) inlineComputedStyles(child, childClone);
+  });
+}
+
+function computedStyleToText(style: CSSStyleDeclaration) {
+  return Array.from(style)
+    .map((property) => `${property}:${style.getPropertyValue(property)};`)
+    .join("");
+}
+
+function loadImage(src: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Unable to render Digital Bill for PDF download."));
+    image.src = src;
+  });
+}
+
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error || new Error("Unable to embed bill image."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+function createA4ImagePdf(jpegDataUrl: string) {
   const pageWidth = 595.28;
   const pageHeight = 841.89;
-  const margin = 46;
-  const rowLabelWidth = 160;
-  const rowValueWidth = pageWidth - margin * 2 - rowLabelWidth;
-  const pages: string[] = [];
-  let commands: string[] = [];
-  let y = pageHeight - margin;
+  const margin = 24;
+  const jpegBytes = dataUrlToBytes(jpegDataUrl);
+  const { width: imageWidth, height: imageHeight } = readJpegSize(jpegBytes);
+  const availableWidth = pageWidth - margin * 2;
+  const availableHeight = pageHeight - margin * 2;
+  const scale = Math.min(availableWidth / imageWidth, availableHeight / imageHeight);
+  const drawWidth = imageWidth * scale;
+  const drawHeight = imageHeight * scale;
+  const x = (pageWidth - drawWidth) / 2;
+  const y = pageHeight - margin - drawHeight;
+  const content = asciiBytes(`q\n${formatPdfNumber(drawWidth)} 0 0 ${formatPdfNumber(drawHeight)} ${formatPdfNumber(x)} ${formatPdfNumber(y)} cm\n/Im1 Do\nQ\n`);
+  const objects = [
+    asciiBytes("<< /Type /Catalog /Pages 2 0 R >>"),
+    asciiBytes("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+    asciiBytes(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /XObject << /Im1 5 0 R >> >> /Contents 4 0 R >>`),
+    streamObject(content),
+    streamObject(jpegBytes, `<< /Type /XObject /Subtype /Image /Width ${imageWidth} /Height ${imageHeight} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpegBytes.length} >>`),
+  ];
 
-  function addPage() {
-    if (commands.length) pages.push(commands.join("\n"));
-    commands = [];
-    y = pageHeight - margin;
-    rect(margin, margin, pageWidth - margin * 2, pageHeight - margin * 2, "1 1 1 rg", true);
-  }
-
-  function lineColor(color: string) {
-    commands.push(`${color} RG`);
-  }
-
-  function fillColor(color: string) {
-    commands.push(`${color} rg`);
-  }
-
-  function rect(x: number, topY: number, width: number, height: number, color: string, fill = false) {
-    fillColor(color);
-    commands.push(`${x} ${pageHeight - topY - height} ${width} ${height} re ${fill ? "f" : "S"}`);
-  }
-
-  function text(value: string, x: number, topY: number, size: number, color = "0.2 0.16 0.12 rg", font = "F1") {
-    fillColor(color);
-    commands.push(`BT /${font} ${size} Tf ${x} ${pageHeight - topY - size} Td (${escapePdfText(value)}) Tj ET`);
-  }
-
-  function wrap(value: string, maxChars: number) {
-    const words = String(value || "-").split(/\s+/);
-    const lines: string[] = [];
-    let line = "";
-
-    for (const word of words) {
-      if ((line ? `${line} ${word}` : word).length <= maxChars) {
-        line = line ? `${line} ${word}` : word;
-      } else {
-        if (line) lines.push(line);
-        if (word.length > maxChars) {
-          for (let index = 0; index < word.length; index += maxChars) lines.push(word.slice(index, index + maxChars));
-          line = "";
-        } else {
-          line = word;
-        }
-      }
-    }
-
-    if (line) lines.push(line);
-    return lines.length ? lines : ["-"];
-  }
-
-  function drawHeader() {
-    rect(margin, margin, 54, 54, "0.73 0.41 0.20 rg", true);
-    text("FT", margin + 15, margin + 18, 18, "1 1 1 rg", "F2");
-    text("FairTrade", margin + 68, margin + 4, 24, "0.2 0.16 0.12 rg", "F2");
-    text("Trusted Mandi Platform", margin + 68, margin + 32, 10, "0.46 0.33 0.21 rg");
-    text("Fair Trade Log", margin, margin + 74, 28, "0.2 0.16 0.12 rg", "F2");
-    text(`Deal ID: ${values.dealId} | Date: ${values.issuedAt}`, margin, margin + 108, 10, "0.46 0.33 0.21 rg");
-    rect(pageWidth - margin - 112, margin + 8, 112, 28, "0.91 0.88 0.82 rg", true);
-    text(values.status, pageWidth - margin - 100, margin + 17, 10, "0.2 0.16 0.12 rg", "F2");
-    lineColor("0.85 0.8 0.73");
-    commands.push(`${margin} ${pageHeight - margin - 128} m ${pageWidth - margin} ${pageHeight - margin - 128} l S`);
-    y = margin + 150;
-  }
-
-  function drawRow(label: string, value: string) {
-    const valueLines = wrap(value, 52);
-    const labelLines = wrap(label, 24);
-    const rowHeight = Math.max(34, 18 + Math.max(valueLines.length, labelLines.length) * 13);
-
-    if (y + rowHeight > pageHeight - margin - 80) {
-      addPage();
-      drawHeader();
-    }
-
-    rect(margin, y, rowLabelWidth, rowHeight, "0.96 0.94 0.89 rg", true);
-    lineColor("0.85 0.8 0.73");
-    commands.push(`${margin} ${pageHeight - y - rowHeight} ${rowLabelWidth} ${rowHeight} re S`);
-    commands.push(`${margin + rowLabelWidth} ${pageHeight - y - rowHeight} ${rowValueWidth} ${rowHeight} re S`);
-    labelLines.forEach((line, index) => text(line, margin + 12, y + 12 + index * 13, 10, "0.46 0.33 0.21 rg", "F2"));
-    valueLines.forEach((line, index) => text(line, margin + rowLabelWidth + 12, y + 12 + index * 13, 11, "0.2 0.16 0.12 rg", "F2"));
-    y += rowHeight;
-  }
-
-  addPage();
-  drawHeader();
-  values.rows.forEach(([label, value]) => drawRow(label, String(value || "-")));
-  y += 18;
-  rect(margin, y, pageWidth - margin * 2, 42, "0.91 0.88 0.82 rg", true);
-  text("Total Transaction Amount", margin + 14, y + 15, 12, "0.2 0.16 0.12 rg", "F2");
-  text(values.total, pageWidth - margin - 150, y + 15, 14, "0.2 0.16 0.12 rg", "F2");
-  y += 58;
-  text("This Digital Bill is generated only after deal completion and uses the completed deal values recorded in FairTrade.", margin, y, 9, "0.46 0.33 0.21 rg");
-  pages.push(commands.join("\n"));
-
-  return new Blob([buildPdfDocument(pages)], { type: "application/pdf" });
+  return new Blob([buildPdf(objects)], { type: "application/pdf" });
 }
 
-function buildPdfDocument(pageStreams: string[]) {
-  const objects: string[] = [];
-  const fontId = 3;
-  const pageRefs = pageStreams.map((_, index) => `${4 + index * 2} 0 R`).join(" ");
+function dataUrlToBytes(dataUrl: string) {
+  const base64 = dataUrl.split(",")[1] || "";
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
 
-  objects[0] = "<< /Type /Catalog /Pages 2 0 R >>";
-  objects[1] = `<< /Type /Pages /Kids [${pageRefs}] /Count ${pageStreams.length} >>`;
-  objects[2] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>";
+function readJpegSize(bytes: Uint8Array) {
+  for (let index = 2; index < bytes.length; index += 1) {
+    if (bytes[index] !== 0xff) continue;
 
-  pageStreams.forEach((stream, index) => {
-    const pageObjectId = 4 + index * 2;
-    const contentObjectId = pageObjectId + 1;
-    objects[pageObjectId - 1] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 ${fontId} 0 R /F2 ${fontId} 0 R >> >> /Contents ${contentObjectId} 0 R >>`;
-    objects[contentObjectId - 1] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
-  });
+    const marker = bytes[index + 1];
+    const length = (bytes[index + 2] << 8) + bytes[index + 3];
+    if (marker >= 0xc0 && marker <= 0xc3) {
+      return {
+        height: (bytes[index + 5] << 8) + bytes[index + 6],
+        width: (bytes[index + 7] << 8) + bytes[index + 8],
+      };
+    }
 
-  let output = "%PDF-1.4\n";
+    index += 1 + length;
+  }
+
+  throw new Error("Unable to read captured bill image size.");
+}
+
+function formatPdfNumber(value: number) {
+  return Number(value.toFixed(2));
+}
+
+function asciiBytes(value: string) {
+  return new TextEncoder().encode(value);
+}
+
+function streamObject(stream: Uint8Array, dictionary?: string) {
+  const header = dictionary || `<< /Length ${stream.length} >>`;
+  return concatBytes([
+    asciiBytes(`${header}\nstream\n`),
+    stream,
+    asciiBytes("\nendstream"),
+  ]);
+}
+
+function buildPdf(objects: Uint8Array[]) {
+  const chunks: Uint8Array[] = [asciiBytes("%PDF-1.4\n")];
   const offsets: number[] = [0];
+  let position = chunks[0].length;
+
   objects.forEach((object, index) => {
-    offsets[index + 1] = output.length;
-    output += `${index + 1} 0 obj\n${object}\nendobj\n`;
+    offsets[index + 1] = position;
+    const prefix = asciiBytes(`${index + 1} 0 obj\n`);
+    const suffix = asciiBytes("\nendobj\n");
+    chunks.push(prefix, object, suffix);
+    position += prefix.length + object.length + suffix.length;
   });
-  const xrefStart = output.length;
-  output += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+
+  const xrefStart = position;
+  let trailer = `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
   offsets.slice(1).forEach((offset) => {
-    output += `${String(offset).padStart(10, "0")} 00000 n \n`;
+    trailer += `${String(offset).padStart(10, "0")} 00000 n \n`;
   });
-  output += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
-  return output;
+  trailer += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
+  chunks.push(asciiBytes(trailer));
+
+  return concatBytes(chunks);
 }
 
-function escapePdfText(value: string) {
-  return value
-    .normalize("NFKD")
-    .replace(/[^\x20-\x7E]/g, "")
-    .replace(/\\/g, "\\\\")
-    .replace(/\(/g, "\\(")
-    .replace(/\)/g, "\\)");
+function concatBytes(chunks: Uint8Array[]) {
+  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+  chunks.forEach((chunk) => {
+    result.set(chunk, offset);
+    offset += chunk.length;
+  });
+  return result;
 }
 
 function LogCell({ label, value, large = false }: { label: string; value: string; large?: boolean }) {
