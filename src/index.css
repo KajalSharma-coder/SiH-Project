@@ -22,11 +22,39 @@ button, input, select, textarea {
 }
 
 @media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
   .no-print {
     display: none !important;
   }
 
+  html,
   body {
     background: white;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #digital-bill,
+  #digital-bill * {
+    visibility: visible;
+  }
+
+  #digital-bill {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  .a4-bill {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 }

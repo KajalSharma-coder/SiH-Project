@@ -593,6 +593,10 @@ export function Bill() {
   const issuedAt = deal.updatedAt
     ? new Date(deal.updatedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
     : deal.date;
+  const marketLocation = formatMarketLocation(deal);
+  const buyerPaymentStatus = deal.paymentGiven ? "Given" : paymentLabel("PENDING");
+  const sellerPaymentStatus = deal.paymentReceived ? "Received" : paymentLabel("PENDING");
+  const paymentReference = getPaymentReference(deal);
 
   function printBill() {
     window.print();
@@ -603,9 +607,12 @@ export function Bill() {
     const values = getBillValues(deal!, {
       issuedAt,
       status: statusLabel(deal!.status),
-      paymentStatus: paymentLabel(deal!.paymentStatus),
+      buyerPaymentStatus,
+      sellerPaymentStatus,
+      paymentReference,
       total: pdfMoney(total),
       startingPrice: `${pdfMoney(deal!.offer)} / ${t("common.quintal")}`,
+      negotiation: `${pdfMoney(deal!.counterOffer)} / ${t("common.quintal")}`,
       finalPrice: `${pdfMoney(deal!.agreedPrice)} / ${t("common.quintal")}`,
       quantity: `${number(deal!.quantityQt)} ${t("common.quintal")}`,
     });
@@ -674,69 +681,93 @@ export function Bill() {
         </div>
       </div>
 
-      {/* Bill Body */}
-      <div id="digital-bill" className="a4-bill rounded-2xl border border-[#D8CDBB] bg-white p-8 shadow-soft">
-        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#D8CDBB] pb-6">
-          <div>
+      <div id="digital-bill" className="a4-bill overflow-hidden rounded-lg border-2 border-[#555633] bg-white shadow-soft">
+        <header className="grid border-b-2 border-[#555633] md:grid-cols-[1fr_1.35fr]">
+          <div className="border-b-2 border-[#555633] p-5 md:border-b-0 md:border-r-2">
             <FairTradeLogo size="sm" clickable={false} />
-            <p className="text-xs font-bold text-[#33291F] uppercase tracking-wider">{t("bill.record")}</p>
-            <h1 className="text-3xl font-black text-[#33291F] mt-1">{t("bill.title")}</h1>
-            <p className="text-xs text-[#765536] mt-1">
-              {t("bill.reference")}: <b>{deal.id}</b> | {t("bill.issued")}: {issuedAt}
-            </p>
+            <h1 className="mt-6 text-3xl font-black text-[#33291F]">Fair Trade Log</h1>
           </div>
-          <span className={`rounded-xl px-4 py-2 text-xs font-black ${statusClass(deal.status)}`}>
-            {statusLabel(deal.status)}
-          </span>
-        </div>
-
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <BillRow label={t("bill.buyerId")} value={deal.buyerId} />
-          <BillRow label={t("bill.sellerId")} value={deal.farmerId} />
-          <BillRow label={t("bill.sellerFarmer")} value={deal.farmer} />
-          <BillRow label={t("common.buyer")} value={deal.buyer} />
-          <BillRow label={t("bill.dealId")} value={deal.id} />
-          <BillRow label={t("deal.cropAndLot")} value={`${deal.crop} - ${deal.lotId}`} />
-          <BillRow label={t("common.mandi")} value={[deal.marketName, deal.marketCity, deal.marketState].filter(Boolean).join(", ")} />
-          <BillRow label={t("deal.qualityGrade")} value={deal.grade} />
-          <BillRow label={t("common.quantity")} value={`${number(deal.quantityQt)} ${t("common.quintal")}`} />
-          <BillRow label={t("bill.startingPrice")} value={`${money(deal.offer)} / ${t("common.quintal")}`} />
-          <BillRow label={t("bill.finalPrice")} value={`${money(deal.agreedPrice)} / ${t("common.quintal")}`} />
-          <BillRow label={t("bill.transactionOption")} value={deal.transactionMode} />
-          <BillRow label={t("deal.paymentStatus")} value={paymentLabel(deal.paymentStatus)} />
-          <BillRow label={t("bill.paymentGivenStatus")} value={deal.paymentGiven ? t("common.confirmed") : paymentLabel("PENDING")} />
-          <BillRow label={t("bill.paymentReceivedStatus")} value={deal.paymentReceived ? t("common.confirmed") : paymentLabel("PENDING")} />
-          <div className="md:col-span-2">
-            <BillRow label={t("common.totalAmount")} value={money(total)} strong />
+          <div className="grid text-sm font-bold text-[#33291F] sm:grid-cols-2">
+            <LogCell label="Date" value={issuedAt} />
+            <LogCell label="Mandi Name / Where the deal is made" value={marketLocation} />
+            <LogCell label="Buyer ID" value={deal.buyerId} />
+            <LogCell label="Seller ID" value={deal.farmerId} />
+            <LogCell label="Shop / Deal location" value={marketLocation} />
+            <LogCell label="Deal ID" value={deal.id} />
           </div>
-        </div>
+        </header>
 
-        <div className="mt-6 rounded-xl border border-[#D8CDBB] bg-[#F4EFE4] p-4 text-xs leading-6 text-[#765536]">
-          <b className="text-[#33291F]">{t("bill.completionStatus")}:</b> {statusLabel(deal.status)}. {t("bill.actualDataNote")}
-        </div>
+        <main className="space-y-7 p-5 sm:p-7">
+          <section className="rounded-md border-2 border-[#555633]">
+            <div className="grid sm:grid-cols-2">
+              <LogCell label="Buyer ID" value={deal.buyerId} large />
+              <LogCell label="Buyer Name" value={deal.buyer} large />
+              <LogCell label="Seller ID" value={deal.farmerId} large />
+              <LogCell label="Seller Name" value={deal.farmer} large />
+            </div>
+          </section>
+
+          <section className="rounded-md border-2 border-[#555633] bg-[#F4EFE4]/50 p-5">
+            <div className="grid gap-5 md:grid-cols-[1fr_1fr]">
+              <LineField label="Crop (Lot ID)" value={`${deal.crop} (${deal.lotId})`} />
+              <LineField label="Start Price" value={`${money(deal.offer)} / ${t("common.quintal")}`} />
+              <LineField label="Negotiation" value={`${money(deal.counterOffer)} / ${t("common.quintal")}`} />
+              <LineField label="Final Price" value={`${money(deal.agreedPrice)} / ${t("common.quintal")}`} />
+            </div>
+          </section>
+
+          <section className="rounded-md border-2 border-[#555633] p-5">
+            <div className="grid gap-5 lg:grid-cols-[1fr_1fr]">
+              <div className="space-y-4">
+                <LineField label="Transaction Mode" value={deal.transactionMode} />
+                <LineField label="FairTrade Transactions" value={deal.transactionMode === "Use FairTrade" ? statusLabel(deal.status) : deal.transactionMode} />
+                <LineField label={t("common.totalAmount")} value={money(total)} strong />
+              </div>
+              <div className="rounded-md border border-[#D8CDBB] bg-[#F4EFE4] p-4">
+                <h2 className="text-sm font-black uppercase text-[#33291F]">Payment Status</h2>
+                <div className="mt-4 space-y-3 text-sm font-bold text-[#33291F]">
+                  <StatusLine party="Seller" status={sellerPaymentStatus} />
+                  <StatusLine party="Buyer" status={buyerPaymentStatus} />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-md border-2 border-[#555633] bg-[#E9E1D2] p-5">
+            <LineField label="UPI ID / Transaction ID" value={paymentReference} />
+          </section>
+
+          <p className="text-xs font-semibold leading-5 text-[#765536]">
+            <b className="text-[#33291F]">{t("bill.completionStatus")}:</b> {statusLabel(deal.status)}. {t("bill.actualDataNote")}
+          </p>
+        </main>
       </div>
     </div>
   );
 }
 
-function getBillValues(deal: Deal, values: { issuedAt: string; status: string; paymentStatus: string; total: string; startingPrice: string; finalPrice: string; quantity: string }) {
-  const market = [deal.marketName, deal.marketCity, deal.marketState].filter(Boolean).join(", ");
+function getBillValues(deal: Deal, values: { issuedAt: string; status: string; buyerPaymentStatus: string; sellerPaymentStatus: string; paymentReference: string; total: string; startingPrice: string; negotiation: string; finalPrice: string; quantity: string }) {
+  const market = formatMarketLocation(deal);
   const rows = [
+    ["Date", values.issuedAt],
+    ["Mandi Name / Where the deal is made", market],
     ["Buyer ID", deal.buyerId],
+    ["Buyer Name", deal.buyer],
     ["Seller ID", deal.farmerId],
+    ["Seller Name", deal.farmer],
     ["Deal ID", deal.id],
-    ["Buyer", deal.buyer],
-    ["Seller", deal.farmer],
-    ["Crop / Commodity", deal.crop],
-    ["Lot ID", deal.lotId],
+    ["Shop / Deal Location", market],
+    ["Crop (Lot ID)", `${deal.crop} (${deal.lotId})`],
     ["Quantity", values.quantity],
     ["Grade", deal.grade],
     ["Starting Price", values.startingPrice],
-    ["Negotiated / Final Price", values.finalPrice],
-    ["Market / Mandi", market],
+    ["Negotiation", values.negotiation],
+    ["Final Price", values.finalPrice],
     ["Transaction Mode", deal.transactionMode],
-    ["Payment Status", values.paymentStatus],
-    ["Date / Time", values.issuedAt],
+    ["FairTrade Transactions", deal.transactionMode === "Use FairTrade" ? values.status : deal.transactionMode],
+    ["Payment Status - Seller", values.sellerPaymentStatus],
+    ["Payment Status - Buyer", values.buyerPaymentStatus],
+    ["UPI ID / Transaction ID", values.paymentReference],
     ["Deal Completion Status", values.status],
   ];
 
@@ -751,6 +782,14 @@ function getBillValues(deal: Deal, values: { issuedAt: string; status: string; p
 
 function pdfMoney(value: number) {
   return `Rs ${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(value)}`;
+}
+
+function formatMarketLocation(deal: Deal) {
+  return [deal.marketName, deal.marketCity, deal.marketState].filter(Boolean).join(", ") || "-";
+}
+
+function getPaymentReference(deal: Deal) {
+  return deal.paymentGiven || deal.paymentReceived ? "Not recorded in payment data" : "-";
 }
 
 function createDigitalBillPdf(values: ReturnType<typeof getBillValues>) {
@@ -816,8 +855,8 @@ function createDigitalBillPdf(values: ReturnType<typeof getBillValues>) {
     text("FT", margin + 15, margin + 18, 18, "1 1 1 rg", "F2");
     text("FairTrade", margin + 68, margin + 4, 24, "0.2 0.16 0.12 rg", "F2");
     text("Trusted Mandi Platform", margin + 68, margin + 32, 10, "0.46 0.33 0.21 rg");
-    text("Digital Bill", margin, margin + 74, 28, "0.2 0.16 0.12 rg", "F2");
-    text(`Bill Reference: ${values.dealId} | Issued: ${values.issuedAt}`, margin, margin + 108, 10, "0.46 0.33 0.21 rg");
+    text("Fair Trade Log", margin, margin + 74, 28, "0.2 0.16 0.12 rg", "F2");
+    text(`Deal ID: ${values.dealId} | Date: ${values.issuedAt}`, margin, margin + 108, 10, "0.46 0.33 0.21 rg");
     rect(pageWidth - margin - 112, margin + 8, 112, 28, "0.91 0.88 0.82 rg", true);
     text(values.status, pageWidth - margin - 100, margin + 17, 10, "0.2 0.16 0.12 rg", "F2");
     lineColor("0.85 0.8 0.73");
@@ -896,6 +935,34 @@ function escapePdfText(value: string) {
     .replace(/\\/g, "\\\\")
     .replace(/\(/g, "\\(")
     .replace(/\)/g, "\\)");
+}
+
+function LogCell({ label, value, large = false }: { label: string; value: string; large?: boolean }) {
+  return (
+    <div className="min-h-20 border-b border-r border-[#D8CDBB] p-3 last:border-r-0 sm:[&:nth-child(even)]:border-r-0">
+      <p className="text-[11px] font-black uppercase text-[#765536]">{label}</p>
+      <p className={`mt-2 break-words font-extrabold text-[#33291F] ${large ? "text-base" : "text-sm"}`}>{value || "-"}</p>
+    </div>
+  );
+}
+
+function LineField({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="grid items-end gap-3 sm:grid-cols-[170px_1fr]">
+      <p className={`font-black text-[#33291F] ${strong ? "text-lg" : "text-base"}`}>{label}</p>
+      <p className={`min-h-9 border-b-2 border-[#555633] pb-1 font-bold text-[#33291F] ${strong ? "text-xl" : "text-sm"}`}>{value || "-"}</p>
+    </div>
+  );
+}
+
+function StatusLine({ party, status }: { party: string; status: string }) {
+  return (
+    <div className="grid grid-cols-[88px_24px_1fr] items-center gap-2">
+      <span>{party}</span>
+      <span className="text-center text-[#B96832]">-&gt;</span>
+      <span>{status}</span>
+    </div>
+  );
 }
 
 function BillRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
