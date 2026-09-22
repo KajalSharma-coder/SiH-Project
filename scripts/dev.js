@@ -1,15 +1,30 @@
 import { execFileSync, spawn } from "node:child_process";
 
 const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
+const mlServiceUrl = process.env.ML_SERVICE_URL || "http://localhost:8001";
 
 const processes = [
   spawn(`${npmCmd} --prefix server run dev`, {
     stdio: "inherit",
     shell: true,
+    env: {
+      ...process.env,
+      PORT: process.env.PORT || "5000",
+      ML_SERVICE_URL: mlServiceUrl,
+    },
   }),
   spawn(`${npmCmd} run dev:frontend`, {
     stdio: "inherit",
     shell: true,
+  }),
+  spawn(`${npmCmd} run dev:ml`, {
+    stdio: "inherit",
+    shell: true,
+    env: {
+      ...process.env,
+      PORT: process.env.ML_PORT || "8001",
+      ML_MODEL_PATH: process.env.ML_MODEL_PATH || "artifacts/tanmay_price_model.joblib",
+    },
   }),
 ];
 

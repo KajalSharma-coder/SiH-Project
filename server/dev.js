@@ -1,7 +1,7 @@
 import http from "node:http";
 
 const PORT = Number(process.env.PORT) || 5000;
-const HEALTH_URL = `http://localhost:${PORT}/health`;
+const HEALTH_URL = `http://localhost:${PORT}/api/health`;
 let shuttingDown = false;
 let reuseMonitor = null;
 
@@ -16,7 +16,7 @@ function checkHealth() {
       res.on("end", () => {
         try {
           const data = JSON.parse(body);
-          resolve(res.statusCode === 200 && data.status === "ok");
+          resolve(res.statusCode === 200 && data.status === "ok" && Object.hasOwn(data, "database"));
         } catch {
           resolve(false);
         }
