@@ -32,7 +32,9 @@ services:
           type: web
           envVarKey: RENDER_EXTERNAL_URL
       - key: ML_API_TIMEOUT_MS
-        value: 10000
+        value: 30000
+      - key: ML_API_RETRIES
+        value: 2
       - key: ML_SERVICE_URL
         fromService:
           name: fairtrade-ml
@@ -50,5 +52,9 @@ services:
         value: 3.11.9
       - key: ML_MODEL_PATH
         value: artifacts/tanmay_price_model.joblib
+      - key: ML_DB_CONNECT_TIMEOUT_SECONDS
+        value: 3
+      - key: ML_DB_STATEMENT_TIMEOUT_MS
+        value: 2500
       - key: DATABASE_URL
         sync: false

@@ -25,6 +25,14 @@ _configured_model_path = Path(os.getenv("ML_MODEL_PATH", "artifacts/tanmay_price
 MODEL_PATH = _configured_model_path if _configured_model_path.is_absolute() else BASE_DIR / _configured_model_path
 
 
+def get_int_env(name: str, default: int) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+    return max(value, 1)
+
+
 def get_database_url() -> str:
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
@@ -33,7 +41,13 @@ def get_database_url() -> str:
 
 
 def get_connection():
-    return psycopg2.connect(get_database_url())
+    connect_timeout = get_int_env("ML_DB_CONNECT_TIMEOUT_SECONDS", 3)
+    statement_timeout_ms = get_int_env("ML_DB_STATEMENT_TIMEOUT_MS", 2500)
+    return psycopg2.connect(
+        get_database_url(),
+        connect_timeout=connect_timeout,
+        options=f"-c statement_timeout={statement_timeout_ms}",
+    )
 
 
 def fetch_data_gov_records(

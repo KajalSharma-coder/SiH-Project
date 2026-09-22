@@ -8,13 +8,15 @@ const app = express();
 const PORT = Number(process.env.PORT) || 5000;
 const HOST = "0.0.0.0";
 const JWT_SECRET = process.env.JWT_SECRET;
-const ML_SERVICE_URL = process.env.ML_SERVICE_URL;
 const FRONTEND_URLS = (process.env.FRONTEND_URL || "")
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
 const ALLOWED_FRONTEND_URLS = new Set(FRONTEND_URLS);
 const isProduction = process.env.NODE_ENV === "production";
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || (isProduction ? "" : "http://localhost:8001");
+const ML_API_TIMEOUT_MS = Math.max(positiveNumberEnv("ML_API_TIMEOUT_MS", 30000), 30000);
+const ML_API_RETRIES = nonNegativeIntegerEnv("ML_API_RETRIES", 2);
 
 if (isProduction && !JWT_SECRET) {
   throw new Error("JWT_SECRET is required in production.");
@@ -38,6 +40,16 @@ function isAllowedOrigin(origin) {
   }
 
   return false;
+}
+
+function positiveNumberEnv(name, fallback) {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function nonNegativeIntegerEnv(name, fallback) {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value >= 0 ? Math.floor(value) : fallback;
 }
 
 const corsOptions = {
@@ -760,67 +772,122 @@ app.post("/api/quality/samples", authenticateToken, async (req, res) => {
 });
 
 async function callMlPrediction(payload) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(process.env.ML_API_TIMEOUT_MS) || 10000);
   const targetUrl = ML_SERVICE_URL ? `${ML_SERVICE_URL.replace(/\/+$/, "")}/predict` : "";
 
-  try {
-    if (!ML_SERVICE_URL) {
-      const configError = new Error("ML_SERVICE_URL is required to call the ML prediction service.");
-      configError.status = 503;
-      throw configError;
-    }
-
-    const response = await fetch(targetUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-    const responseBody = await response.text();
-    const data = parseJsonResponseBody(responseBody);
-
-    if (!response.ok) {
-      const message = data.detail || data.error || "ML prediction service failed.";
-      logMlPredictionFailure({
-        targetUrl,
-        status: response.status,
-        responseBody,
-        requestBody: payload,
-        message,
-      });
-      const error = new Error(message);
-      error.status = response.status;
-      throw error;
-    }
-
-    return data;
-  } catch (error) {
-    if (error.name === "AbortError") {
-      logMlPredictionFailure({
-        targetUrl,
-        requestBody: payload,
-        message: "ML prediction service timed out.",
-        fetchError: error.message,
-      });
-      const timeoutError = new Error("ML prediction service timed out.");
-      timeoutError.status = 504;
-      throw timeoutError;
-    }
-
-    if (error.status) throw error;
-    logMlPredictionFailure({
-      targetUrl,
-      requestBody: payload,
-      message: "ML prediction service is unavailable.",
-      fetchError: error.message,
-    });
-    const unavailable = new Error("ML prediction service is unavailable. Please start the FastAPI ML service.");
-    unavailable.status = 503;
-    throw unavailable;
-  } finally {
-    clearTimeout(timeout);
+  if (!ML_SERVICE_URL) {
+    const configError = new Error("ML_SERVICE_URL is required to call the ML prediction service.");
+    configError.status = 503;
+    throw configError;
   }
+
+  let lastError;
+  const startedAt = Date.now();
+  const maxAttempts = ML_API_RETRIES + 1;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), ML_API_TIMEOUT_MS);
+    const attemptStartedAt = Date.now();
+
+    try {
+      console.info("ML proxy request started", {
+        targetUrl,
+        attempt,
+        maxAttempts,
+        timeoutMs: ML_API_TIMEOUT_MS,
+        payload,
+      });
+
+      const response = await fetch(targetUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+      const responseBody = await response.text();
+      const data = parseJsonResponseBody(responseBody);
+      const durationMs = Date.now() - attemptStartedAt;
+
+      if (!response.ok) {
+        const message = data.detail || data.error || "ML prediction service failed.";
+        const error = new Error(message);
+        error.status = response.status;
+        error.responseBody = responseBody;
+        error.retryable = isRetryableMlStatus(response.status);
+
+        throw error;
+      }
+
+      console.info("ML proxy request succeeded", {
+        targetUrl,
+        attempt,
+        durationMs,
+        totalDurationMs: Date.now() - startedAt,
+      });
+      return data;
+    } catch (error) {
+      clearTimeout(timeout);
+      const durationMs = Date.now() - attemptStartedAt;
+      const normalizedError = normalizeMlProxyError(error);
+      lastError = normalizedError;
+
+      logMlPredictionFailure({
+        targetUrl,
+        requestBody: payload,
+        status: normalizedError.status,
+        responseBody: normalizedError.responseBody,
+        message: normalizedError.message,
+        fetchError: normalizedError.fetchError,
+        attempt,
+        durationMs,
+      });
+
+      if (attempt >= maxAttempts || !shouldRetryMlError(normalizedError)) {
+        break;
+      }
+
+      await sleep(250 * attempt);
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  throw lastError || Object.assign(new Error("ML prediction service failed."), { status: 503 });
+}
+
+function normalizeMlProxyError(error) {
+  if (error.name === "AbortError") {
+    const timeoutError = new Error("ML prediction service timed out.");
+    timeoutError.status = 504;
+    timeoutError.retryable = true;
+    timeoutError.fetchError = error.message;
+    return timeoutError;
+  }
+
+  if (error.status) {
+    error.retryable = error.retryable ?? isRetryableMlStatus(error.status);
+    return error;
+  }
+
+  const unavailable = new Error("ML prediction service is unavailable. Please start the FastAPI ML service.");
+  unavailable.status = 503;
+  unavailable.retryable = true;
+  unavailable.fetchError = error.message;
+  return unavailable;
+}
+
+function isRetryableMlStatus(status) {
+  return status === 408 || status === 429 || status === 502 || status === 503 || status === 504;
+}
+
+function shouldRetryMlError(error) {
+  return Boolean(error.retryable);
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 function parseJsonResponseBody(responseBody) {
@@ -839,7 +906,7 @@ function truncateForLog(value, maxLength = 2000) {
   return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
 }
 
-function logMlPredictionFailure({ targetUrl, status, responseBody, requestBody, message, fetchError }) {
+function logMlPredictionFailure({ targetUrl, status, responseBody, requestBody, message, fetchError, attempt, durationMs }) {
   console.error("ML prediction request failed", {
     targetUrl,
     status: status || null,
@@ -847,6 +914,8 @@ function logMlPredictionFailure({ targetUrl, status, responseBody, requestBody, 
     requestBody,
     message,
     fetchError: fetchError || null,
+    attempt: attempt || null,
+    durationMs: durationMs || null,
   });
 }
 
