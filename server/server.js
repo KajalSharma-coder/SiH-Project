@@ -261,6 +261,34 @@ app.post("/api/lots", authenticateToken, async (req, res) => {
   }
 });
 
+app.delete("/api/lots/:id", authenticateToken, async (req, res) => {
+  try {
+    const lot = await get("SELECT * FROM lots WHERE id = $1", [req.params.id]);
+    if (!lot) {
+      return res.status(404).json({ error: "Produce lot not found." });
+    }
+
+    if (lot.farmer_id !== req.user.id) {
+      return res.status(403).json({ error: "You can delete only your own produce lots." });
+    }
+
+    const linkedDeal = await get("SELECT id FROM deals WHERE lot_id = $1 LIMIT 1", [req.params.id]);
+    if (linkedDeal) {
+      return res.status(409).json({ error: "This produce lot has an active deal and cannot be deleted." });
+    }
+
+    const result = await run("DELETE FROM lots WHERE id = $1", [req.params.id]);
+    if (!result.changes) {
+      return res.status(404).json({ error: "Produce lot not found." });
+    }
+
+    res.json({ ok: true, id: req.params.id });
+  } catch (err) {
+    console.error("Delete lot error:", err);
+    res.status(500).json({ error: "Failed to delete produce lot" });
+  }
+});
+
 // Buyer Requirements / Demands
 app.get("/api/demands", async (req, res) => {
   try {

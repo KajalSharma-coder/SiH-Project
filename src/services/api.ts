@@ -171,6 +171,12 @@ export async function createLot(payload: Partial<Lot>) {
   });
 }
 
+export async function deleteLot(id: string) {
+  return request<{ ok: true; id: string }>(`/lots/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
 // ---------- Buyer Demands APIs ----------
 export async function getDemands() {
   return request<Demand[]>("/demands");

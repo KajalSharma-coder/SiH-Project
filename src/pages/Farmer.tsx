@@ -1,11 +1,11 @@
-import { FileText, Handshake, Package, Plus, ShieldCheck, Store, TrendingUp, Users } from "lucide-react";
+import { FileText, Handshake, Package, Plus, ShieldCheck, Store, Trash2, TrendingUp, Users } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Section, StatCard } from "../components/Cards";
 import { MarketFields } from "../components/MarketFields";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
-import { createLot, getDeals, getDemands, getLots, registerSample } from "../services/api";
+import { createLot, deleteLot, getDeals, getDemands, getLots, registerSample } from "../services/api";
 import type { Crop, Deal, Demand, Grade, Lot } from "../types";
 import { money } from "../utils/format";
 import { EmptyState, Loading, PageHeader } from "./Market";
@@ -19,6 +19,8 @@ export function FarmerDashboard() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [demands, setDemands] = useState<Demand[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingLotId, setDeletingLotId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([getLots(), getDeals(), getDemands()])
@@ -38,6 +40,23 @@ export function FarmerDashboard() {
   const myDeals = user ? deals.filter((deal) => deal.farmerId === user.id || deal.farmer === user.name) : deals;
   const activeDeals = myDeals.filter((deal) => deal.status !== "COMPLETED");
   const reliability = shownLots.length ? Math.round(shownLots.reduce((sum, lot) => sum + lot.reliability, 0) / shownLots.length) : 0;
+
+  async function handleDeleteLot(lot: Lot) {
+    if (!user || lot.farmerId !== user.id) return;
+    const confirmed = window.confirm(`Delete ${lot.crop} quotation?`);
+    if (!confirmed) return;
+
+    setDeleteError(null);
+    setDeletingLotId(lot.id);
+    try {
+      await deleteLot(lot.id);
+      setLots((current) => current.filter((item) => item.id !== lot.id));
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "Failed to delete produce lot.");
+    } finally {
+      setDeletingLotId(null);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -61,6 +80,7 @@ export function FarmerDashboard() {
       </section>
 
       <Section title={t("dashboard.recentProduce")}>
+        {deleteError && <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{deleteError}</p>}
         <div className="overflow-x-auto rounded-md border border-[#D8CDBB] bg-white">
           {shownLots.length === 0 ? (
             <EmptyState text={t("dashboard.noProduceLots")} />
@@ -73,18 +93,34 @@ export function FarmerDashboard() {
                   <th className="p-4">{t("common.grade")}</th>
                   <th className="p-4">{t("common.price")}</th>
                   <th className="p-4">{t("common.status")}</th>
+                  <th className="p-4">{t("common.action")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#D8CDBB]">
-                {shownLots.slice(0, 6).map((lot) => (
-                  <tr key={lot.id}>
-                    <td className="p-4 font-bold">{lot.crop}</td>
-                    <td className="p-4">{lot.quantityQt} qt</td>
-                    <td className="p-4">{lot.grade}</td>
-                    <td className="p-4 font-bold text-[#33291F]">{money(lot.expectedPrice)}/qt</td>
-                    <td className="p-4"><span className="rounded-full bg-[#E9E1D2] px-3 py-1 text-xs font-bold text-[#B96832]">{lot.status}</span></td>
-                  </tr>
-                ))}
+                {shownLots.slice(0, 6).map((lot) => {
+                  const canDelete = Boolean(user && lot.farmerId === user.id);
+                  const deleting = deletingLotId === lot.id;
+                  return (
+                    <tr key={lot.id}>
+                      <td className="p-4 font-bold">{lot.crop}</td>
+                      <td className="p-4">{lot.quantityQt} qt</td>
+                      <td className="p-4">{lot.grade}</td>
+                      <td className="p-4 font-bold text-[#33291F]">{money(lot.expectedPrice)}/qt</td>
+                      <td className="p-4"><span className="rounded-full bg-[#E9E1D2] px-3 py-1 text-xs font-bold text-[#B96832]">{lot.status}</span></td>
+                      <td className="p-4">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteLot(lot)}
+                          disabled={!canDelete || deleting}
+                          className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <Trash2 size={14} />
+                          {deleting ? "Deleting..." : "Delete"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
