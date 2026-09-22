@@ -256,6 +256,7 @@ const en = {
   "status.PENDING": "Pending",
   "status.SENT": "Sent",
   "status.RECEIVED": "Received",
+  "status.RECIEVED": "Received",
   "status.ACCEPTED": "Accepted",
 };
 
@@ -499,6 +500,7 @@ const hi: typeof en = {
   "status.PENDING": "लंबित",
   "status.SENT": "भेजा गया",
   "status.RECEIVED": "प्राप्त",
+  "status.RECIEVED": "प्राप्त",
   "status.ACCEPTED": "स्वीकृत",
 };
 

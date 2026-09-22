@@ -320,7 +320,10 @@ function normalizeDealStatus(status) {
 }
 
 function derivePaymentStatus(row) {
-  if (row.payment_status) return row.payment_status;
+  // Keep legacy database values compatible with the canonical API status.
+  const storedStatus = String(row.payment_status || "").trim().toUpperCase();
+  if (storedStatus === "RECIEVED") return "RECEIVED";
+  if (storedStatus === "RECEIVED" || storedStatus === "SENT" || storedStatus === "PENDING") return storedStatus;
   if (row.payment_received) return "RECEIVED";
   if (row.payment_given) return "SENT";
   return "PENDING";
