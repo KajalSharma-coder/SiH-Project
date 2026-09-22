@@ -1,5 +1,4 @@
-import { ArrowRight, BadgeIndianRupee, CheckCircle2, ChevronLeft, ChevronRight, Handshake, Landmark, LineChart, Phone, ShieldCheck, Sprout, Store, Tractor, UsersRound } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowRight, BadgeIndianRupee, CheckCircle2, Handshake, Landmark, LineChart, Phone, ShieldCheck, Sprout, Store, Tractor, UsersRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import { FairTradeLogo } from "../components/Logo";
 
@@ -24,47 +23,23 @@ const stakeholders = [
 
 const benefits = ["Transparent Deals", "Price Intelligence", "Trusted Quality", "Direct Buyer-Seller Connection"] as const;
 
-const heroSlides = [
-  { src: "/assets/home-slider-1.jpg", alt: "Farmers checking fresh crop produce at a mandi" },
-  { src: "/assets/home-slider-2.jpg", alt: "Agricultural market with crop bags and traders" },
-  { src: "/assets/home-slider-3.jpg", alt: "Farmer using digital crop price information" },
-  { src: "/assets/home-slider-4.jpg", alt: "Buyer and farmer discussing fair crop trade" },
-  { src: "/assets/home-slider-5.jpg", alt: "Fresh harvest prepared for mandi sale" },
-] as const;
+const heroImage = {
+  src: "/assets/home-slider-1.jpg",
+  alt: "Farmers checking fresh crop produce at a mandi",
+} as const;
 
 export function Home() {
-  const [activeSlide, setActiveSlide] = useState(0);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setActiveSlide((current) => (current + 1) % heroSlides.length);
-    }, 4500);
-
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const showPreviousSlide = () => {
-    setActiveSlide((current) => (current - 1 + heroSlides.length) % heroSlides.length);
-  };
-
-  const showNextSlide = () => {
-    setActiveSlide((current) => (current + 1) % heroSlides.length);
-  };
-
   return (
     <div>
       <section
         className="relative isolate min-h-[570px] overflow-hidden border-b border-[#D8CDBB] bg-[#241B15] sm:min-h-[610px] lg:min-h-[660px]"
       >
         <div className="absolute inset-0 -z-10">
-          {heroSlides.map((slide, index) => (
-            <img
-              key={slide.src}
-              src={slide.src}
-              alt={slide.alt}
-              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${index === activeSlide ? "opacity-100" : "opacity-0"}`}
-            />
-          ))}
+          <img
+            src={heroImage.src}
+            alt={heroImage.alt}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
           <div className="absolute inset-0 bg-gradient-to-r from-[#241B15]/78 via-[#33291F]/36 to-[#241B15]/20" />
           <div className="absolute inset-0 bg-[#FFF8EC]/10" />
         </div>
@@ -81,33 +56,6 @@ export function Home() {
               Get Started <ArrowRight size={16} />
             </Link>
           </div>
-        </div>
-        <button
-          type="button"
-          onClick={showPreviousSlide}
-          className="absolute left-3 top-1/2 hidden h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-white/35 bg-[#241B15]/55 text-white shadow-sm transition hover:bg-[#241B15]/75 sm:grid"
-          aria-label="Previous slide"
-        >
-          <ChevronLeft size={22} />
-        </button>
-        <button
-          type="button"
-          onClick={showNextSlide}
-          className="absolute right-3 top-1/2 hidden h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-white/35 bg-[#241B15]/55 text-white shadow-sm transition hover:bg-[#241B15]/75 sm:grid"
-          aria-label="Next slide"
-        >
-          <ChevronRight size={22} />
-        </button>
-        <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-2">
-          {heroSlides.map((slide, index) => (
-            <button
-              key={slide.src}
-              type="button"
-              onClick={() => setActiveSlide(index)}
-              className={`h-2.5 rounded-full transition-all ${index === activeSlide ? "w-8 bg-[#F4EFE4]" : "w-2.5 bg-[#F4EFE4]/55 hover:bg-[#F4EFE4]/80"}`}
-              aria-label={`Show slide ${index + 1}`}
-            />
-          ))}
         </div>
       </section>
 
