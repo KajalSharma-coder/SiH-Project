@@ -4,6 +4,7 @@ export type Grade = "FAQ" | "A" | "Premium" | "Lab Verified" | "Organic";
 
 export type ForecastPoint = {
   label: string;
+  price?: number;
   actual?: number;
   predicted?: number;
   low: number;

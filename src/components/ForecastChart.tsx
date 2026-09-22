@@ -19,8 +19,7 @@ export function ForecastChart({ data, height = 280 }: { data: ForecastPoint[]; h
           <Tooltip formatter={(value: number, name) => [money(value), name]} contentStyle={{ borderRadius: 8, border: "1px solid #D8CDBB" }} />
           <Area type="monotone" dataKey="high" stroke="transparent" fill="url(#forecastFill)" />
           <Area type="monotone" dataKey="low" stroke="transparent" fill="#F4EFE4" />
-          <Line type="monotone" dataKey="actual" stroke="#555633" strokeWidth={3} dot={{ r: 4 }} connectNulls />
-          <Line type="monotone" dataKey="predicted" stroke="#B96832" strokeWidth={3} dot={{ r: 4 }} connectNulls />
+          <Line type="monotone" dataKey="price" stroke="#B96832" strokeWidth={3} dot={{ r: 4 }} connectNulls />
         </AreaChart>
       </ResponsiveContainer>
     </div>

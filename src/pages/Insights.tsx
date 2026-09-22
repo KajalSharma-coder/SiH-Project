@@ -108,27 +108,11 @@ export function PricePrediction() {
   }
 
   const currentPrice = mlPrediction?.currentPrice ?? quote.currentPrice;
-  const mlForecast: ForecastPoint[] | null = mlPrediction
-    ? [
-        {
-          label: "Today",
-          actual: mlPrediction.currentPrice,
-          low: mlPrediction.currentPrice,
-          high: mlPrediction.currentPrice,
-          confidence: 90,
-        },
-        ...mlPrediction.predictions.map((point) => ({
-          label: new Date(point.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
-          predicted: point.predictedPrice,
-          low: point.low,
-          high: point.high,
-          confidence: point.confidence,
-        })),
-      ]
-    : null;
-  const forecastData = mlForecast ?? quote.forecast;
-  const forecast = forecastData.filter((point) => point.predicted);
-  const predicted = forecast[forecast.length - 1]?.predicted ?? currentPrice;
+  const mlForecast = mlPrediction ? buildMlForecast(mlPrediction) : null;
+  const fallbackForecast = normalizeForecastSeries(quote.forecast);
+  const forecastData = mlForecast?.length ? mlForecast : fallbackForecast;
+  const forecast = forecastData.filter((point) => isFiniteNumber(point.price));
+  const predicted = mlPrediction?.predictions.at(-1)?.predictedPrice ?? forecast.at(-1)?.price ?? currentPrice;
   const change = predicted - currentPrice;
   const changePercent = currentPrice ? (change / currentPrice) * 100 : 0;
   const confidence = mlPrediction?.predictions.at(-1)?.confidence ?? quote.confidence;
@@ -266,6 +250,69 @@ function PredictionSelect({ label, value, options, onChange }: { label: string; 
 
 function uniqueOptions(values: string[], fallback: string[] = []) {
   return Array.from(new Set([...values.filter(Boolean), ...fallback])).sort((a, b) => a.localeCompare(b));
+}
+
+function buildMlForecast(prediction: MLPredictionResponse): ForecastPoint[] {
+  if (!isFiniteNumber(prediction.currentPrice) || !prediction.predictions.length) return [];
+
+  const today = new Date();
+  const currentPrice = prediction.currentPrice;
+  const points: ForecastPoint[] = [
+    {
+      label: "Today",
+      price: currentPrice,
+      actual: currentPrice,
+      predicted: currentPrice,
+      low: currentPrice,
+      high: currentPrice,
+      confidence: prediction.predictions[0]?.confidence ?? 90,
+    },
+  ];
+
+  prediction.predictions.forEach((point, index) => {
+    if (!isFiniteNumber(point.predictedPrice)) return;
+
+    const predictedDate = addDays(today, index + 1);
+    const price = point.predictedPrice;
+    points.push({
+      label: predictedDate.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
+      price,
+      predicted: price,
+      low: isFiniteNumber(point.low) ? point.low : price,
+      high: isFiniteNumber(point.high) ? point.high : price,
+      confidence: isFiniteNumber(point.confidence) ? point.confidence : 0,
+    });
+  });
+
+  return points;
+}
+
+function normalizeForecastSeries(points: ForecastPoint[]): ForecastPoint[] {
+  const normalized: ForecastPoint[] = [];
+
+  points.forEach((point) => {
+    const price = isFiniteNumber(point.price) ? point.price : isFiniteNumber(point.predicted) ? point.predicted : point.actual;
+    if (!isFiniteNumber(price)) return;
+
+    normalized.push({
+      ...point,
+      price,
+      low: isFiniteNumber(point.low) ? point.low : price,
+      high: isFiniteNumber(point.high) ? point.high : price,
+    });
+  });
+
+  return normalized;
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
 }
 
 function getPriceTrend(prediction: MLPredictionResponse | null) {
