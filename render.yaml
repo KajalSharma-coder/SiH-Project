@@ -35,6 +35,10 @@ services:
         value: 30000
       - key: ML_API_RETRIES
         value: 2
+      - key: ML_API_RETRY_BASE_DELAY_MS
+        value: 5000
+      - key: ML_API_RETRY_MAX_DELAY_MS
+        value: 10000
       - key: ML_SERVICE_URL
         fromService:
           name: fairtrade-ml

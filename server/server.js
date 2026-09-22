@@ -17,6 +17,8 @@ const isProduction = process.env.NODE_ENV === "production";
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || (isProduction ? "" : "http://localhost:8001");
 const ML_API_TIMEOUT_MS = Math.max(positiveNumberEnv("ML_API_TIMEOUT_MS", 30000), 30000);
 const ML_API_RETRIES = nonNegativeIntegerEnv("ML_API_RETRIES", 2);
+const ML_API_RETRY_BASE_DELAY_MS = positiveNumberEnv("ML_API_RETRY_BASE_DELAY_MS", 5000);
+const ML_API_RETRY_MAX_DELAY_MS = positiveNumberEnv("ML_API_RETRY_MAX_DELAY_MS", 10000);
 
 if (isProduction && !JWT_SECRET) {
   throw new Error("JWT_SECRET is required in production.");
@@ -846,7 +848,15 @@ async function callMlPrediction(payload) {
         break;
       }
 
-      await sleep(250 * attempt);
+      const retryDelayMs = getMlRetryDelayMs(attempt);
+      console.info("ML proxy retry scheduled", {
+        targetUrl,
+        attempt,
+        nextAttempt: attempt + 1,
+        retryDelayMs,
+        reason: normalizedError.message,
+      });
+      await sleep(retryDelayMs);
     } finally {
       clearTimeout(timeout);
     }
@@ -882,6 +892,10 @@ function isRetryableMlStatus(status) {
 
 function shouldRetryMlError(error) {
   return Boolean(error.retryable);
+}
+
+function getMlRetryDelayMs(attempt) {
+  return Math.min(ML_API_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1), ML_API_RETRY_MAX_DELAY_MS);
 }
 
 function sleep(ms) {
