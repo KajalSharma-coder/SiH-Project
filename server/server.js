@@ -21,6 +21,10 @@ if (isProduction && !JWT_SECRET) {
   throw new Error("JWT_SECRET is required in production.");
 }
 
+if (isProduction && !ML_SERVICE_URL) {
+  throw new Error("ML_SERVICE_URL is required in production.");
+}
+
 function isAllowedOrigin(origin) {
   if (!origin) return true;
   if (ALLOWED_FRONTEND_URLS.has(origin)) return true;

@@ -4,7 +4,10 @@ import sys
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from model import MODEL_PATH, fetch_fairtrade_records, load_model_artifact, predict_future_prices
+try:
+    from .model import MODEL_PATH, fetch_fairtrade_records, load_model_artifact, predict_future_prices
+except ImportError:
+    from model import MODEL_PATH, fetch_fairtrade_records, load_model_artifact, predict_future_prices
 
 app = FastAPI(title="FairTrade ML Price Prediction Service")
 _artifact = None
