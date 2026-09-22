@@ -9,12 +9,11 @@ const PORT = Number(process.env.PORT) || 5000;
 const HOST = "0.0.0.0";
 const JWT_SECRET = process.env.JWT_SECRET;
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL;
-const PRODUCTION_FRONTEND_URL = "https://sihproject-eight-kappa.vercel.app";
 const FRONTEND_URLS = (process.env.FRONTEND_URL || "")
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
-const ALLOWED_FRONTEND_URLS = new Set([PRODUCTION_FRONTEND_URL, ...FRONTEND_URLS]);
+const ALLOWED_FRONTEND_URLS = new Set(FRONTEND_URLS);
 const isProduction = process.env.NODE_ENV === "production";
 
 if (isProduction && !JWT_SECRET) {

@@ -14,16 +14,32 @@ function getToken(): string | null {
   return localStorage.getItem("fairtrade_token");
 }
 
-async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly data?: unknown,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+type RequestOptions = Omit<RequestInit, "body"> & { body?: unknown };
+
+async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
   if (!API_BASE_URL) {
-    throw new Error("VITE_API_URL is required for production API requests.");
+    throw new ApiError("VITE_API_URL is required for production API requests.", 0);
   }
 
   const token = getToken();
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
+
+  if (options.body !== undefined && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
 
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
@@ -35,32 +51,57 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers,
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
     });
   } catch (error) {
-    throw new Error("Backend server is unavailable. Check VITE_API_URL and try again.");
+    if (error instanceof ApiError) throw error;
+    throw new ApiError("Backend server is unavailable. Check VITE_API_URL and try again.", 0);
   }
 
-  const data = await response.json();
+  const rawBody = await response.text();
+  let data: unknown = null;
+  if (rawBody) {
+    try {
+      data = JSON.parse(rawBody);
+    } catch {
+      data = rawBody;
+    }
+  }
 
   if (!response.ok) {
-    throw new Error(data.error || "API Request Failed");
+    const message =
+      typeof data === "object" && data !== null && "error" in data
+        ? String(data.error)
+        : typeof data === "object" && data !== null && "message" in data
+          ? String(data.message)
+          : `Request failed (${response.status})`;
+    throw new ApiError(message, response.status, data);
   }
 
   return data as T;
 }
 
+/** Shared JSON client for all API communication, including authenticated CRUD calls. */
+export const api = {
+  get: <T>(endpoint: string, options?: Omit<RequestOptions, "method" | "body">) => request<T>(endpoint, { ...options, method: "GET" }),
+  post: <T>(endpoint: string, body?: unknown, options?: Omit<RequestOptions, "method" | "body">) => request<T>(endpoint, { ...options, method: "POST", body }),
+  put: <T>(endpoint: string, body?: unknown, options?: Omit<RequestOptions, "method" | "body">) => request<T>(endpoint, { ...options, method: "PUT", body }),
+  patch: <T>(endpoint: string, body?: unknown, options?: Omit<RequestOptions, "method" | "body">) => request<T>(endpoint, { ...options, method: "PATCH", body }),
+  delete: <T>(endpoint: string, options?: Omit<RequestOptions, "method" | "body">) => request<T>(endpoint, { ...options, method: "DELETE" }),
+};
+
 // ---------- Auth APIs ----------
 export async function registerUser(payload: { role: string; name: string; identifier: string; password: string }) {
   return request<{ token: string; user: { id: string; role: "Farmer" | "Buyer"; name: string; identifier: string } }>(
     "/auth/register",
-    { method: "POST", body: JSON.stringify(payload) }
+    { method: "POST", body: payload }
   );
 }
 
 export async function loginUser(payload: { identifier: string; password: string }) {
   return request<{ token: string; user: { id: string; role: "Farmer" | "Buyer"; name: string; identifier: string } }>(
     "/auth/login",
-    { method: "POST", body: JSON.stringify(payload) }
+    { method: "POST", body: payload }
   );
 }
 
@@ -90,13 +131,13 @@ export async function getMlPrediction(payload: MLPredictionRequest) {
     database_warning?: string | null;
   }>("/ml/predict", {
     method: "POST",
-    body: JSON.stringify({
+    body: {
       crop: payload.crop,
       state: payload.state,
       district: payload.district,
       market: payload.market,
       prediction_days: payload.predictionDays,
-    }),
+    },
   });
 
   return {
@@ -126,7 +167,7 @@ export async function getLots() {
 export async function createLot(payload: Partial<Lot>) {
   return request<Lot>("/lots", {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: payload,
   });
 }
 
@@ -138,7 +179,7 @@ export async function getDemands() {
 export async function createDemand(payload: Partial<Demand>) {
   return request<Demand>("/demands", {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: payload,
   });
 }
 
@@ -154,14 +195,14 @@ export async function getDealById(id: string) {
 export async function startDeal(payload: { lotId: string; quantity: number; pricePerUnit: number; message?: string }) {
   return request<Deal>("/deals", {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: payload,
   });
 }
 
 export async function updateDeal(id: string, patch: Partial<Deal>) {
   return request<Deal>(`/deals/${id}`, {
     method: "PATCH",
-    body: JSON.stringify(patch),
+    body: patch,
   });
 }
 
@@ -172,14 +213,14 @@ export async function getDealOffers(dealId: string) {
 export async function sendDealOffer(dealId: string, payload: { quantity: number; pricePerUnit: number; message?: string }) {
   return request<DealOffer>(`/deals/${dealId}/offers`, {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: payload,
   });
 }
 
 export async function sendCounterOffer(dealId: string, payload: { quantity: number; pricePerUnit: number; message?: string }) {
   return request<DealOffer>(`/deals/${dealId}/counter`, {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: payload,
   });
 }
 
@@ -207,7 +248,7 @@ export async function getChatMessages(dealId: string) {
 export async function sendChatMessage(dealId: string, text: string) {
   return request<ChatMessage>(`/deals/${dealId}/messages`, {
     method: "POST",
-    body: JSON.stringify({ message: text }),
+    body: { message: text },
   });
 }
 
@@ -215,7 +256,7 @@ export async function sendChatMessage(dealId: string, text: string) {
 export async function registerSample(lotId?: string) {
   return request<{ sampleId: string; status: string; message: string }>("/quality/samples", {
     method: "POST",
-    body: JSON.stringify({ lotId }),
+    body: { lotId },
   });
 }
 

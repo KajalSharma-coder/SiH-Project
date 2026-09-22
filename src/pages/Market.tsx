@@ -21,16 +21,27 @@ export function Marketplace() {
   const [crop, setCrop] = useState("All");
   const [region, setRegion] = useState("All");
   const [grade, setGrade] = useState("All");
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  function loadMarketplace() {
+    setLoading(true);
+    setError(null);
     Promise.all([getLots(), getDemands()])
       .then(([lotData, demandData]) => {
         setLots(lotData);
         setDemands(demandData);
       })
-      .catch(console.error)
+      .catch((requestError: unknown) => {
+        console.error(requestError);
+        setError(requestError instanceof Error ? requestError.message : "Unable to load marketplace data.");
+      })
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    loadMarketplace();
   }, []);
 
   const filteredLots = useMemo(
@@ -39,9 +50,10 @@ export function Marketplace() {
         (lot) =>
           (crop === "All" || lot.crop === crop) &&
           (region === "All" || lot.city === region || lot.mandi === region) &&
-          (grade === "All" || lot.grade === grade),
+          (grade === "All" || lot.grade === grade) &&
+          `${lot.crop} ${lot.farmerName} ${lot.city} ${lot.mandi}`.toLowerCase().includes(search.trim().toLowerCase()),
       ),
-    [lots, crop, region, grade],
+    [lots, crop, region, grade, search],
   );
 
   if (loading) {
@@ -68,7 +80,13 @@ export function Marketplace() {
             {unique(lots.map((lot) => lot.grade)).map((value) => <option key={value} value={value}>{value === "All" ? t("common.all") : value}</option>)}
           </select>
         </div>
+        <label className="mt-3 block">
+          <span className="sr-only">Search marketplace</span>
+          <input value={search} onChange={(event) => setSearch(event.target.value)} className={`w-full ${inputClass}`} placeholder="Search crop, farmer, city or mandi" />
+        </label>
       </section>
+
+      {error && <div className="flex items-center justify-between gap-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700"><span>{error}</span><button type="button" onClick={loadMarketplace} className="rounded border border-red-300 px-2 py-1 text-xs">Retry</button></div>}
 
       <section className="grid gap-4 xl:grid-cols-[1fr_360px]">
         <div className="space-y-3">
