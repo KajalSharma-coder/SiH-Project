@@ -21,14 +21,29 @@ export function BuyerDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([getDemands(), getLots(), getDeals()])
-      .then(([demandData, lotData, dealData]) => {
+    let cancelled = false;
+
+    async function loadDashboard(initialLoad = false) {
+      try {
+        const [demandData, lotData, dealData] = await Promise.all([getDemands(), getLots(), getDeals()]);
+        if (cancelled) return;
         setDemands(demandData);
         setLots(lotData);
         setDeals(dealData);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      } catch (err) {
+        // Keep the last successful dashboard data while a background refresh fails.
+        console.error("Error refreshing buyer dashboard:", err);
+      } finally {
+        if (initialLoad && !cancelled) setLoading(false);
+      }
+    }
+
+    loadDashboard(true);
+    const intervalId = window.setInterval(() => loadDashboard(), 2500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, []);
 
   if (loading) return <Loading text={t("common.loading")} />;

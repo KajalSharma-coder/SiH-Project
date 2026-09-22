@@ -9,6 +9,13 @@ import { useI18n } from "../context/I18nContext";
 import type { ChatMessage, Deal, DealOffer, MLPredictionResponse } from "../types";
 import { money, number } from "../utils/format";
 
+const POLL_INTERVAL_MS = 2500;
+
+function mergeById<T extends { id: string }>(current: T[], incoming: T[]) {
+  const incomingIds = new Set(incoming.map((item) => item.id));
+  return [...incoming, ...current.filter((item) => !incomingIds.has(item.id))];
+}
+
 export function DealRoom() {
   const { id = "DL-9001" } = useParams();
   const { user } = useAuth();
@@ -23,8 +30,11 @@ export function DealRoom() {
   const [priceInsight, setPriceInsight] = useState<MLPredictionResponse | null>(null);
   const [priceInsightLoading, setPriceInsightLoading] = useState(false);
   const [priceInsightError, setPriceInsightError] = useState<string | null>(null);
+  const [messageText, setMessageText] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadData() {
       try {
         const [dData, offerData, mData] = await Promise.all([
@@ -32,17 +42,49 @@ export function DealRoom() {
           getDealOffers(id),
           getChatMessages(id),
         ]);
+        if (cancelled) return;
         setDeal(dData);
-        setOffers(offerData);
-        setMessages(mData);
+        setOffers((current) => mergeById(current, offerData));
+        setMessages((current) => mergeById(current, mData));
       } catch (err: any) {
         console.error("Error loading deal room:", err);
-        setError(err.message || t("deal.notFound"));
+        if (!cancelled) setError(err.message || t("deal.notFound"));
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     loadData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function pollDealRoom() {
+      try {
+        const [dData, offerData, messageData] = await Promise.all([
+          getDealById(id),
+          getDealOffers(id),
+          getChatMessages(id),
+        ]);
+        if (cancelled) return;
+        setDeal(dData);
+        setOffers((current) => mergeById(current, offerData));
+        setMessages((current) => mergeById(current, messageData));
+      } catch (err) {
+        // Polling is best-effort: keep the last successful data visible.
+        console.error("Error polling deal room:", err);
+      }
+    }
+
+    const intervalId = window.setInterval(pollDealRoom, POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, [id]);
 
   useEffect(() => {
@@ -104,7 +146,7 @@ export function DealRoom() {
   async function reloadDeal() {
     const [dData, offerData] = await Promise.all([getDealById(deal!.id), getDealOffers(deal!.id)]);
     setDeal(dData);
-    setOffers(offerData);
+    setOffers((current) => mergeById(current, offerData));
   }
 
   async function handleOffer(event: FormEvent<HTMLFormElement>) {
@@ -154,17 +196,17 @@ export function DealRoom() {
 
   async function handleSendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const text = String(form.get("message") || "").trim();
+    const text = messageText.trim();
     if (!text) return;
     setSending(true);
 
     try {
       const newMsg = await sendChatMessage(deal!.id, text);
-      setMessages((prev) => [...prev, newMsg]);
-      event.currentTarget.reset();
-    } catch (err) {
+      setMessages((current) => mergeById(current, [newMsg]));
+      setMessageText("");
+    } catch (err: any) {
       console.error(err);
+      setError(err.message || "Failed to send message.");
     } finally {
       setSending(false);
     }
@@ -344,6 +386,8 @@ export function DealRoom() {
             <input
               name="message"
               required
+              value={messageText}
+              onChange={(event) => setMessageText(event.target.value)}
               placeholder={t("deal.chatPlaceholder")}
               className="min-w-0 flex-1 rounded-xl border border-[#D8CDBB] px-3.5 py-3 text-xs outline-none focus:border-[#B96832]"
             />

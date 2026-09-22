@@ -23,14 +23,29 @@ export function FarmerDashboard() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([getLots(), getDeals(), getDemands()])
-      .then(([lotData, dealData, demandData]) => {
+    let cancelled = false;
+
+    async function loadDashboard(initialLoad = false) {
+      try {
+        const [lotData, dealData, demandData] = await Promise.all([getLots(), getDeals(), getDemands()]);
+        if (cancelled) return;
         setLots(lotData);
         setDeals(dealData);
         setDemands(demandData);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      } catch (err) {
+        // Keep the last successful dashboard data while a background refresh fails.
+        console.error("Error refreshing farmer dashboard:", err);
+      } finally {
+        if (initialLoad && !cancelled) setLoading(false);
+      }
+    }
+
+    loadDashboard(true);
+    const intervalId = window.setInterval(() => loadDashboard(), 2500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, []);
 
   if (loading) return <Loading text={t("common.loading")} />;
