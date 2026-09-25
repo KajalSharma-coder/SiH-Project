@@ -331,6 +331,9 @@ function getPriceTrend(prediction: MLPredictionResponse | null) {
 export function DailyPriceTracking() {
   const { t } = useI18n();
   const [quotes, setQuotes] = useState<MarketQuote[]>([]);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedCrop, setSelectedCrop] = useState("");
+  const [selectedMandi, setSelectedMandi] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -340,13 +343,24 @@ export function DailyPriceTracking() {
       .finally(() => setLoading(false));
   }, []);
 
+  const crops = useMemo(() => Array.from(new Set(quotes.map((quote) => quote.crop))).sort(), [quotes]);
+  const mandis = useMemo(() => Array.from(new Set(quotes.map((quote) => quote.mandi))).sort(), [quotes]);
+
   const rows = useMemo(
     () =>
-      quotes.slice(0, 12).map((quote, index) => ({
-        ...quote,
-        date: new Date(Date.now() - index * 86400000).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
-      })),
-    [quotes],
+      quotes
+        .filter((quote) => {
+          const matchesDate = !selectedDate || getDateKey(quote.updatedAt) === selectedDate;
+          const matchesCrop = !selectedCrop || quote.crop === selectedCrop;
+          const matchesMandi = !selectedMandi || quote.mandi === selectedMandi;
+          return matchesDate && matchesCrop && matchesMandi;
+        })
+        .slice(0, 12)
+        .map((quote) => ({
+          ...quote,
+          date: formatTrackingDate(quote.updatedAt),
+        })),
+    [quotes, selectedCrop, selectedDate, selectedMandi],
   );
 
   if (loading) {
@@ -354,8 +368,49 @@ export function DailyPriceTracking() {
   }
 
   return (
-    <div className="space-y-5">
+      <div className="space-y-5">
       <PageHeader title={t("daily.title")} subtitle={t("daily.subtitle")} />
+
+      <section className="rounded-md border border-[#D8CDBB] bg-white p-4 shadow-sm">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_auto] xl:items-end">
+          <label className="text-xs font-bold uppercase tracking-wide text-[#765536]">
+            Date
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(event) => setSelectedDate(event.target.value)}
+              aria-label="Date"
+              className={inputClass}
+            />
+          </label>
+          <label className="text-xs font-bold uppercase tracking-wide text-[#765536]">
+            Crop
+            <select value={selectedCrop} onChange={(event) => setSelectedCrop(event.target.value)} aria-label="Crop" className={inputClass}>
+              <option value="">All Crops</option>
+              {crops.map((crop) => <option key={crop} value={crop}>{crop}</option>)}
+            </select>
+          </label>
+          <label className="text-xs font-bold uppercase tracking-wide text-[#765536]">
+            Mandi
+            <select value={selectedMandi} onChange={(event) => setSelectedMandi(event.target.value)} aria-label="Mandi" className={inputClass}>
+              <option value="">All Mandis</option>
+              {mandis.map((mandi) => <option key={mandi} value={mandi}>{mandi}</option>)}
+            </select>
+          </label>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedDate("");
+              setSelectedCrop("");
+              setSelectedMandi("");
+            }}
+            aria-label="Clear date, crop and mandi filters"
+            className="rounded-md border border-[#555633] px-4 py-3 text-sm font-bold text-[#555633] transition hover:bg-[#F4EFE4]"
+          >
+            Clear Filters
+          </button>
+        </div>
+      </section>
 
       <div className="overflow-x-auto rounded-md border border-[#D8CDBB] bg-white">
         <table className="min-w-full text-left text-sm">
@@ -369,7 +424,13 @@ export function DailyPriceTracking() {
             </tr>
           </thead>
           <tbody className="divide-y divide-[#D8CDBB]">
-            {rows.map((row) => {
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="p-8 text-center text-sm font-semibold text-[#765536]">
+                  No price records found for the selected filters.
+                </td>
+              </tr>
+            ) : rows.map((row) => {
               const positive = row.change >= 0;
               const Icon = positive ? ArrowUpRight : ArrowDownRight;
               return (
@@ -397,6 +458,19 @@ export function DailyPriceTracking() {
       </div>
     </div>
   );
+}
+
+function getDateKey(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function formatTrackingDate(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export function Reliability() {
