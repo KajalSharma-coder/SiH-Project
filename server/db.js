@@ -152,6 +152,7 @@ export async function initDb() {
       state TEXT NOT NULL,
       district TEXT NOT NULL,
       location TEXT NOT NULL,
+      mandi TEXT,
       quantity REAL,
       status TEXT NOT NULL DEFAULT 'REGISTERED',
       quality_result TEXT,
@@ -162,6 +163,7 @@ export async function initDb() {
     )
   `);
   await run(`CREATE INDEX IF NOT EXISTS crop_samples_farmer_id_idx ON crop_samples (farmer_id)`);
+  await run(`ALTER TABLE crop_samples ADD COLUMN IF NOT EXISTS mandi TEXT`);
 
   await run(`
     CREATE TABLE IF NOT EXISTS lots (

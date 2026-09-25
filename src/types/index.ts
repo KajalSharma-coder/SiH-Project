@@ -74,6 +74,7 @@ export type QualitySample = {
   state: string;
   district: string;
   location: string;
+  mandi: string | null;
   quantity: number | null;
   status: QualitySampleStatus;
   qualityResult: QualityResult | null;

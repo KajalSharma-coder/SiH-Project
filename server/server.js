@@ -872,6 +872,7 @@ function formatCropSample(row) {
     state: row.state,
     district: row.district,
     location: row.location,
+    mandi: row.mandi || null,
     quantity: row.quantity === null || row.quantity === undefined ? null : Number(row.quantity),
     status: row.status,
     qualityResult: row.quality_result,
@@ -896,11 +897,12 @@ function normalizeCropSampleInput(source) {
     state: String(source.state || "").trim(),
     district: String(source.district || "").trim(),
     location: String(source.location || "").trim(),
+    mandi: String(source.mandi || "").trim(),
     quantity: source.quantity === undefined || source.quantity === null || source.quantity === "" ? null : Number(source.quantity),
   };
 
-  if (!input.crop || !input.state || !input.district || !input.location) {
-    const error = new Error("Crop, state, district and location are required.");
+  if (!input.crop || !input.state || !input.district || !input.location || !input.mandi) {
+    const error = new Error("Crop, state, district, location and mandi are required.");
     error.status = 400;
     throw error;
   }
@@ -916,10 +918,10 @@ app.post("/api/quality-check/samples", authenticateToken, requireRole("Farmer"),
   try {
     const input = normalizeCropSampleInput(req.body || {});
     const row = await get(
-      `INSERT INTO crop_samples (sample_id, farmer_id, crop, state, district, location, quantity)
-       VALUES ('QC-' || TO_CHAR(CURRENT_DATE, 'YYYY') || '-' || LPAD(NEXTVAL('quality_sample_number_seq')::TEXT, 4, '0'), $1, $2, $3, $4, $5, $6)
+      `INSERT INTO crop_samples (sample_id, farmer_id, crop, state, district, location, mandi, quantity)
+       VALUES ('QC-' || TO_CHAR(CURRENT_DATE, 'YYYY') || '-' || LPAD(NEXTVAL('quality_sample_number_seq')::TEXT, 4, '0'), $1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [req.user.id, input.crop, input.state, input.district, input.location, input.quantity]
+      [req.user.id, input.crop, input.state, input.district, input.location, input.mandi, input.quantity]
     );
     res.status(201).json(formatCropSample(row));
   } catch (err) {

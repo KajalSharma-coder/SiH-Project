@@ -1,8 +1,8 @@
 import { CheckCircle2, ClipboardCheck, FlaskConical, Loader2, Search, Send, TestTube2 } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { createQualitySample, getQualitySample, getQualitySamples, updateQualityResult, updateQualitySampleStatus, } from "../services/api";
-import type { QualityResult, QualitySample, QualitySampleStatus } from "../types";
+import { createQualitySample, getMarkets, getQualitySample, getQualitySamples, updateQualityResult, updateQualitySampleStatus, } from "../services/api";
+import type { Market, QualityResult, QualitySample, QualitySampleStatus } from "../types";
 import { EmptyState, PageHeader } from "./Market";
 
 const inputClass = "w-full rounded-md border border-[#D8CDBB] bg-white px-3.5 py-3 text-sm outline-none focus:border-[#B96832] focus:ring-2 focus:ring-[#B96832]/15";
@@ -63,6 +63,7 @@ function FarmerQualityView({ samples, loading, onSamplesChange, onError }: { sam
         state: String(form.get("state") || ""),
         district: String(form.get("district") || ""),
         location: String(form.get("location") || ""),
+        mandi: String(form.get("mandi") || ""),
         quantity: form.get("quantity") ? Number(form.get("quantity")) : undefined,
       });
       setRegisteredSample(sample);
@@ -102,9 +103,7 @@ function FarmerQualityView({ samples, loading, onSamplesChange, onError }: { sam
         </div>
         <form onSubmit={handleRegister} className="mt-5 grid gap-4 md:grid-cols-2">
           <SelectField name="crop" label="Crop" options={crops} />
-          <InputField name="state" label="State" placeholder="Rajasthan" />
-          <InputField name="district" label="District" placeholder="Kota" />
-          <InputField name="location" label="Village / Location" placeholder="Ramganj Mandi" />
+          <MarketLocationFields />
           <InputField name="quantity" label="Sample Quantity (optional)" type="number" min="0.01" step="0.01" placeholder="10" />
           <div className="flex items-end justify-end md:col-span-2">
             <button disabled={submitting} className="inline-flex items-center gap-2 rounded-md bg-[#B96832] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#9D5529] disabled:cursor-not-allowed disabled:opacity-60">
@@ -127,7 +126,7 @@ function FarmerQualityView({ samples, loading, onSamplesChange, onError }: { sam
                 <tr key={sample.sampleId}>
                   <td className="p-4 font-black">{sample.sampleId}</td>
                   <td className="p-4 font-semibold">{sample.crop}</td>
-                  <td className="p-4 text-[#765536]">{sample.location}, {sample.district}, {sample.state}</td>
+                  <td className="p-4 text-[#765536]">{sample.location}, {sample.district}, {sample.state}{sample.mandi ? `, ${sample.mandi}` : ""}</td>
                   <td className="p-4"><StatusBadge status={sample.status} /></td>
                   <td className="p-4 font-bold">{sample.qualityResult || "Pending"}</td>
                   <td className="p-4 whitespace-nowrap text-[#765536]">{formatDate(sample.createdAt)}</td>
@@ -199,7 +198,7 @@ function WarehouseQualityView({ samples, loading, onSamplesChange, onError }: { 
         <form onSubmit={search} className="mt-5 flex flex-col gap-3 sm:flex-row"><input required value={sampleId} onChange={(event) => setSampleId(event.target.value)} placeholder="QC-2026-1001" className={`${inputClass} sm:flex-1`} /><button disabled={working} className="inline-flex items-center justify-center gap-2 rounded-md bg-[#555633] px-5 py-3 text-sm font-bold text-[#F4EFE4] disabled:opacity-60"><Search size={17} />Search</button></form>
       </section>
 
-      {loading ? <LoadingSamples /> : selected ? <section className="rounded-md border border-[#D8CDBB] bg-white p-5 shadow-sm"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wide text-[#765536]">Sample ID</p><h2 className="mt-1 text-2xl font-black">{selected.sampleId}</h2></div><StatusBadge status={selected.status} /></div><div className="mt-5 grid gap-3 sm:grid-cols-3"><Info label="Crop" value={selected.crop} /><Info label="Grown At" value={`${selected.location}, ${selected.district}, ${selected.state}`} /><Info label="Quality" value={selected.qualityResult || "Pending"} /></div><div className="mt-5 flex flex-wrap items-end gap-3">{selected.status === "OUT_FOR_TESTING" && <button type="button" disabled={working} onClick={() => void startTesting()} className="inline-flex items-center gap-2 rounded-md border border-[#555633] px-4 py-3 text-sm font-bold text-[#555633] disabled:opacity-60"><TestTube2 size={17} />Start Testing</button>}{(selected.status === "OUT_FOR_TESTING" || selected.status === "TESTING") && <label className="min-w-44 text-xs font-bold text-[#765536]">Quality Result<select value={result} onChange={(event) => setResult(event.target.value as QualityResult)} className={`${inputClass} mt-1`}>{qualityResults.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>}{(selected.status === "OUT_FOR_TESTING" || selected.status === "TESTING") && <button type="button" disabled={working} onClick={() => void saveResult()} className="inline-flex items-center gap-2 rounded-md bg-[#B96832] px-4 py-3 text-sm font-bold text-white disabled:opacity-60"><CheckCircle2 size={17} />Update Quality</button>}</div>{selected.status === "TESTED" && <p className="mt-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm font-bold text-green-800">Quality result updated successfully.</p>}</section> : <EmptyState text="Search a Sample ID to view testing details." />}
+      {loading ? <LoadingSamples /> : selected ? <section className="rounded-md border border-[#D8CDBB] bg-white p-5 shadow-sm"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wide text-[#765536]">Sample ID</p><h2 className="mt-1 text-2xl font-black">{selected.sampleId}</h2></div><StatusBadge status={selected.status} /></div><div className="mt-5 grid gap-3 sm:grid-cols-3"><Info label="Crop" value={selected.crop} /><Info label="Grown At" value={`${selected.location}, ${selected.district}, ${selected.state}`} /><Info label="Mandi" value={selected.mandi || "-"} /><Info label="Quality" value={selected.qualityResult || "Pending"} /></div><div className="mt-5 flex flex-wrap items-end gap-3">{selected.status === "OUT_FOR_TESTING" && <button type="button" disabled={working} onClick={() => void startTesting()} className="inline-flex items-center gap-2 rounded-md border border-[#555633] px-4 py-3 text-sm font-bold text-[#555633] disabled:opacity-60"><TestTube2 size={17} />Start Testing</button>}{(selected.status === "OUT_FOR_TESTING" || selected.status === "TESTING") && <label className="min-w-44 text-xs font-bold text-[#765536]">Quality Result<select value={result} onChange={(event) => setResult(event.target.value as QualityResult)} className={`${inputClass} mt-1`}>{qualityResults.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>}{(selected.status === "OUT_FOR_TESTING" || selected.status === "TESTING") && <button type="button" disabled={working} onClick={() => void saveResult()} className="inline-flex items-center gap-2 rounded-md bg-[#B96832] px-4 py-3 text-sm font-bold text-white disabled:opacity-60"><CheckCircle2 size={17} />Update Quality</button>}</div>{selected.status === "TESTED" && <p className="mt-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm font-bold text-green-800">Quality result updated successfully.</p>}</section> : <EmptyState text="Search a Sample ID to view testing details." />}
 
       <section className="space-y-3"><div className="flex items-center gap-2"><ClipboardCheck size={19} className="text-[#B96832]" /><h2 className="font-black">Samples Awaiting Testing</h2></div>{samples.length === 0 ? <EmptyState text="No crop samples registered yet." /> : <div className="grid gap-3 md:grid-cols-2">{samples.slice(0, 6).map((sample) => <article key={sample.sampleId} className="rounded-md border border-[#D8CDBB] bg-white p-4"><div className="flex items-start justify-between gap-3"><p className="font-black">{sample.sampleId}</p><StatusBadge status={sample.status} /></div><p className="mt-2 text-sm font-semibold">{sample.crop}</p><p className="mt-1 text-sm text-[#765536]">{sample.location}, {sample.district}, {sample.state}</p></article>)}</div>}</section>
     </>
@@ -207,7 +206,57 @@ function WarehouseQualityView({ samples, loading, onSamplesChange, onError }: { 
 }
 
 function SuccessCard({ sample }: { sample: QualitySample }) {
-  return <section className="rounded-md border border-green-200 bg-green-50 p-5 text-green-900"><div className="flex items-center gap-2"><CheckCircle2 size={20} /><h2 className="font-black">Sample Registered Successfully</h2></div><div className="mt-4 grid gap-3 sm:grid-cols-3"><Info label="Sample ID" value={sample.sampleId} /><Info label="Crop" value={sample.crop} /><Info label="Location" value={`${sample.location}, ${sample.district}, ${sample.state}`} /></div></section>;
+  return <section className="rounded-md border border-green-200 bg-green-50 p-5 text-green-900"><div className="flex items-center gap-2"><CheckCircle2 size={20} /><h2 className="font-black">Sample Registered Successfully</h2></div><div className="mt-4 grid gap-3 sm:grid-cols-4"><Info label="Sample ID" value={sample.sampleId} /><Info label="Crop" value={sample.crop} /><Info label="Location" value={`${sample.location}, ${sample.district}, ${sample.state}`} /><Info label="Mandi" value={sample.mandi || "-"} /></div></section>;
+}
+
+function MarketLocationFields() {
+  const [markets, setMarkets] = useState<Market[]>([]);
+  const [state, setState] = useState("");
+  const [district, setDistrict] = useState("");
+  const [location, setLocation] = useState("");
+  const [mandi, setMandi] = useState("");
+
+  useEffect(() => {
+    getMarkets().then((items) => {
+      setMarkets(items);
+      const defaultMarket = items.find((item) => item.name === "Ramganj Mandi") || items[0];
+      if (defaultMarket) {
+        setState(defaultMarket.state);
+        setDistrict(defaultMarket.city);
+        setLocation(defaultMarket.city);
+        setMandi(defaultMarket.name);
+      }
+    }).catch(console.error);
+  }, []);
+
+  const states = uniqueValues(markets.map((item) => item.state));
+  const districts = uniqueValues(markets.filter((item) => item.state === state).map((item) => item.city));
+  const matchingMarkets = markets.filter((item) => item.state === state && item.city === district);
+  const locations = uniqueValues([district, ...matchingMarkets.map((item) => item.city)]);
+  const mandis = uniqueValues(matchingMarkets.map((item) => item.name));
+
+  function updateState(value: string) {
+    const nextDistrict = uniqueValues(markets.filter((market) => market.state === value).map((market) => market.city))[0] || "";
+    const nextMarket = markets.find((item) => item.state === value && item.city === nextDistrict);
+    setState(value);
+    setDistrict(nextDistrict);
+    setLocation(nextDistrict);
+    setMandi(nextMarket?.name || "");
+  }
+
+  function updateDistrict(value: string) {
+    const nextMarket = markets.find((item) => item.state === state && item.city === value);
+    setDistrict(value);
+    setLocation(value);
+    setMandi(nextMarket?.name || "");
+  }
+
+  return <>
+    <SelectField name="state" label="State" options={states} value={state} onChange={updateState} />
+    <SelectField name="district" label="District" options={districts} value={district} onChange={updateDistrict} />
+    <SelectField name="location" label="Village / Location" options={locations} value={location} onChange={setLocation} />
+    <SelectField name="mandi" label="Mandi" options={mandis} value={mandi} onChange={setMandi} />
+  </>;
 }
 
 function StatusBadge({ status }: { status: QualitySampleStatus }) {
@@ -219,8 +268,12 @@ function InputField({ name, label, placeholder, type = "text", min, step }: { na
   return <label className="block"><span className="mb-1 block text-xs font-bold text-[#765536]">{label}</span><input required={name !== "quantity"} name={name} type={type} min={min} step={step} placeholder={placeholder} className={inputClass} /></label>;
 }
 
-function SelectField({ name, label, options }: { name: string; label: string; options: string[] }) {
-  return <label className="block"><span className="mb-1 block text-xs font-bold text-[#765536]">{label}</span><select required name={name} defaultValue={options[0]} className={inputClass}>{options.map((option) => <option key={option}>{option}</option>)}</select></label>;
+function SelectField({ name, label, options, value, onChange }: { name: string; label: string; options: string[]; value?: string; onChange?: (value: string) => void }) {
+  return <label className="block"><span className="mb-1 block text-xs font-bold text-[#765536]">{label}</span><select required name={name} value={value} onChange={(event) => onChange?.(event.target.value)} className={inputClass}><option value="">Select {label}</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>;
+}
+
+function uniqueValues(values: string[]) {
+  return Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b));
 }
 
 function Info({ label, value }: { label: string; value: string }) {

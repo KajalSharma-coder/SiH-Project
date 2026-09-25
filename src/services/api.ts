@@ -122,7 +122,7 @@ export async function getQualitySamples() {
   return request<QualitySample[]>("/quality-check/samples");
 }
 
-export async function createQualitySample(payload: { crop: string; state: string; district: string; location: string; quantity?: number }) {
+export async function createQualitySample(payload: { crop: string; state: string; district: string; location: string; mandi: string; quantity?: number }) {
   return request<QualitySample>("/quality-check/samples", { method: "POST", body: payload });
 }
 
