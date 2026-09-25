@@ -119,44 +119,55 @@ export async function getMarkets() {
 }
 
 export async function getMlPrediction(payload: MLPredictionRequest) {
-  const response = await request<{
-    crop: string;
-    state: string;
-    district: string;
-    market: string;
-    prediction_days: number;
-    current_price: number;
-    predictions: Array<{ date: string; predicted_price: number; low: number; high: number; confidence: number }>;
-    trained_at?: string;
-    database_warning?: string | null;
-  }>("/ml/predict", {
-    method: "POST",
-    body: {
-      crop: payload.crop,
-      state: payload.state,
-      district: payload.district,
-      market: payload.market,
-      prediction_days: payload.predictionDays,
-    },
-  });
+  const requestId = crypto.randomUUID();
+  console.info("[ML-PREDICT] browser request started", { requestId });
 
-  return {
-    crop: response.crop,
-    state: response.state,
-    district: response.district,
-    market: response.market,
-    predictionDays: response.prediction_days,
-    currentPrice: response.current_price,
-    predictions: response.predictions.map((point) => ({
-      date: point.date,
-      predictedPrice: point.predicted_price,
-      low: point.low,
-      high: point.high,
-      confidence: point.confidence,
-    })),
-    trainedAt: response.trained_at,
-    databaseWarning: response.database_warning,
-  } satisfies MLPredictionResponse;
+  try {
+    const response = await request<{
+      crop: string;
+      state: string;
+      district: string;
+      market: string;
+      prediction_days: number;
+      current_price: number;
+      predictions: Array<{ date: string; predicted_price: number; low: number; high: number; confidence: number }>;
+      trained_at?: string;
+      database_warning?: string | null;
+    }>("/ml/predict", {
+      method: "POST",
+      headers: { "X-Request-ID": requestId },
+      body: {
+        crop: payload.crop,
+        state: payload.state,
+        district: payload.district,
+        market: payload.market,
+        prediction_days: payload.predictionDays,
+      },
+    });
+
+    console.info("[ML-PREDICT] browser request completed", { requestId });
+
+    return {
+      crop: response.crop,
+      state: response.state,
+      district: response.district,
+      market: response.market,
+      predictionDays: response.prediction_days,
+      currentPrice: response.current_price,
+      predictions: response.predictions.map((point) => ({
+        date: point.date,
+        predictedPrice: point.predicted_price,
+        low: point.low,
+        high: point.high,
+        confidence: point.confidence,
+      })),
+      trainedAt: response.trained_at,
+      databaseWarning: response.database_warning,
+    } satisfies MLPredictionResponse;
+  } catch (error) {
+    console.warn("[ML-PREDICT] browser request failed", { requestId, error });
+    throw error;
+  }
 }
 
 // ---------- Produce Lots APIs ----------

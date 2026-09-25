@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+import { randomUUID } from "node:crypto";
 import { initDb, run, get, all, getDatabaseStatus } from "./db.js";
 
 const app = express();
@@ -16,7 +17,7 @@ const ALLOWED_FRONTEND_URLS = new Set(FRONTEND_URLS);
 const isProduction = process.env.NODE_ENV === "production";
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || (isProduction ? "" : "http://localhost:8001");
 const ML_API_TIMEOUT_MS = Math.max(positiveNumberEnv("ML_API_TIMEOUT_MS", 30000), 30000);
-const ML_API_RETRIES = nonNegativeIntegerEnv("ML_API_RETRIES", 2);
+const ML_API_RETRIES = Math.min(nonNegativeIntegerEnv("ML_API_RETRIES", 1), 1);
 const ML_API_RETRY_BASE_DELAY_MS = positiveNumberEnv("ML_API_RETRY_BASE_DELAY_MS", 5000);
 const ML_API_RETRY_MAX_DELAY_MS = positiveNumberEnv("ML_API_RETRY_MAX_DELAY_MS", 10000);
 const ML_KEEP_ALIVE_INTERVAL_MS = 5 * 60 * 1000;
@@ -129,7 +130,8 @@ const corsOptions = {
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Request-ID"],
+  exposedHeaders: ["X-Request-ID"],
   optionsSuccessStatus: 204,
 };
 
@@ -865,7 +867,7 @@ app.post("/api/quality/samples", authenticateToken, async (req, res) => {
   }
 });
 
-async function callMlPrediction(payload) {
+async function callMlPrediction(payload, requestId) {
   const targetUrl = ML_SERVICE_URL ? `${ML_SERVICE_URL.replace(/\/+$/, "")}/predict` : "";
 
   if (!ML_SERVICE_URL) {
@@ -884,13 +886,7 @@ async function callMlPrediction(payload) {
     const attemptStartedAt = Date.now();
 
     try {
-      console.info("ML proxy request started", {
-        targetUrl,
-        attempt,
-        maxAttempts,
-        timeoutMs: ML_API_TIMEOUT_MS,
-        payload,
-      });
+      console.info("[ML-PREDICT] forwarding request to ML service", { requestId, targetUrl, attempt, maxAttempts });
 
       const response = await fetch(targetUrl, {
         method: "POST",
@@ -907,17 +903,13 @@ async function callMlPrediction(payload) {
         const error = new Error(message);
         error.status = response.status;
         error.responseBody = responseBody;
+        error.responseData = data;
         error.retryable = isRetryableMlStatus(response.status);
 
         throw error;
       }
 
-      console.info("ML proxy request succeeded", {
-        targetUrl,
-        attempt,
-        durationMs,
-        totalDurationMs: Date.now() - startedAt,
-      });
+      console.info(`[ML-PREDICT] ML response status: ${response.status}`, { requestId, attempt, durationMs });
       return data;
     } catch (error) {
       clearTimeout(timeout);
@@ -926,6 +918,7 @@ async function callMlPrediction(payload) {
       lastError = normalizedError;
 
       logMlPredictionFailure({
+        requestId,
         targetUrl,
         requestBody: payload,
         status: normalizedError.status,
@@ -941,7 +934,8 @@ async function callMlPrediction(payload) {
       }
 
       const retryDelayMs = getMlRetryDelayMs(attempt);
-      console.info("ML proxy retry scheduled", {
+      console.info("[ML-PREDICT] retry scheduled", {
+        requestId,
         targetUrl,
         attempt,
         nextAttempt: attempt + 1,
@@ -979,7 +973,7 @@ function normalizeMlProxyError(error) {
 }
 
 function isRetryableMlStatus(status) {
-  return status === 408 || status === 429 || status === 502 || status === 503 || status === 504;
+  return status === 502 || status === 503 || status === 504;
 }
 
 function shouldRetryMlError(error) {
@@ -1012,8 +1006,9 @@ function truncateForLog(value, maxLength = 2000) {
   return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
 }
 
-function logMlPredictionFailure({ targetUrl, status, responseBody, requestBody, message, fetchError, attempt, durationMs }) {
-  console.error("ML prediction request failed", {
+function logMlPredictionFailure({ requestId, targetUrl, status, responseBody, requestBody, message, fetchError, attempt, durationMs }) {
+  console.error("[ML-PREDICT] upstream request failed", {
+    requestId,
     targetUrl,
     status: status || null,
     responseBody: responseBody ? truncateForLog(responseBody) : null,
@@ -1051,20 +1046,34 @@ function normalizePredictionPayload(source) {
 }
 
 app.post("/api/ml/predict", async (req, res) => {
+  const requestId = req.get("x-request-id") || randomUUID();
+  const startedAt = Date.now();
+  res.setHeader("X-Request-ID", requestId);
+  console.info("[ML-PREDICT] request received", { requestId });
+
   try {
     const payload = normalizePredictionPayload(req.body || {});
-    res.json(await callMlPrediction(payload));
+    const prediction = await callMlPrediction(payload, requestId);
+    console.info("[ML-PREDICT] completed", { requestId, status: 200, elapsedMs: Date.now() - startedAt });
+    res.json(prediction);
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message || "Failed to get ML prediction" });
-  }
-});
-
-app.get("/api/ml/predict", async (req, res) => {
-  try {
-    const payload = normalizePredictionPayload(req.query || {});
-    res.json(await callMlPrediction(payload));
-  } catch (err) {
-    res.status(err.status || 500).json({ error: err.message || "Failed to get ML prediction" });
+    const status = err.status || 500;
+    const code = err.name === "AbortError" || status === 504 && err.message?.toLowerCase().includes("timed out")
+      ? "ML_TIMEOUT"
+      : status === 429
+        ? "ML_RATE_LIMITED"
+        : status >= 500
+          ? "ML_UPSTREAM_ERROR"
+          : "ML_REQUEST_ERROR";
+    console.info(`[ML-PREDICT] ML response status: ${status}`, { requestId, elapsedMs: Date.now() - startedAt });
+    console.info("[ML-PREDICT] completed", { requestId, status, elapsedMs: Date.now() - startedAt });
+    res.status(status).json({
+      error: err.message || "Failed to get ML prediction",
+      code,
+      status,
+      requestId,
+      upstreamError: err.responseData || undefined,
+    });
   }
 });
 

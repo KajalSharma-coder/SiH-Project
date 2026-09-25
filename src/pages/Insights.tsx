@@ -1,11 +1,11 @@
 import { ArrowDownRight, ArrowUpRight, BarChart3, CalendarDays, Package } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ForecastChart } from "../components/ForecastChart";
 import { MarketSelector } from "../components/MarketSelector";
 import { StatCard } from "../components/Cards";
 import { MarketSymbol } from "../components/MarketSymbol";
 import { useI18n } from "../context/I18nContext";
-import { getMarketQuotes, getMlPrediction } from "../services/api";
+import { ApiError, getMarketQuotes, getMlPrediction } from "../services/api";
 import type { ForecastPoint, MarketQuote, MLPredictionResponse } from "../types";
 import { money } from "../utils/format";
 import { Loading, PageHeader } from "./Market";
@@ -21,6 +21,7 @@ export function PricePrediction() {
   const [mlPrediction, setMlPrediction] = useState<MLPredictionResponse | null>(null);
   const [mlLoading, setMlLoading] = useState(false);
   const [mlError, setMlError] = useState<string | null>(null);
+  const predictionInFlight = useRef(false);
   const [form, setForm] = useState({
     crop: "",
     state: "",
@@ -89,6 +90,9 @@ export function PricePrediction() {
   }
 
   async function handlePredict() {
+    if (predictionInFlight.current) return;
+
+    predictionInFlight.current = true;
     setMlLoading(true);
     setMlError(null);
 
@@ -96,9 +100,9 @@ export function PricePrediction() {
       const prediction = await getMlPrediction(form);
       setMlPrediction(prediction);
     } catch (error) {
-      setMlPrediction(null);
-      setMlError(error instanceof Error ? error.message : "Prediction failed. Please check the ML service and try again.");
+      setMlError(getPredictionErrorMessage(error));
     } finally {
+      predictionInFlight.current = false;
       setMlLoading(false);
     }
   }
@@ -251,6 +255,24 @@ function PredictionSelect({ label, value, options, onChange }: { label: string; 
 
 function uniqueOptions(values: string[], fallback: string[] = []) {
   return Array.from(new Set([...values.filter(Boolean), ...fallback])).sort((a, b) => a.localeCompare(b));
+}
+
+function getPredictionErrorMessage(error: unknown) {
+  if (!(error instanceof ApiError)) {
+    return "Prediction failed. Please try again.";
+  }
+
+  const data = typeof error.data === "object" && error.data !== null ? error.data as { code?: string } : {};
+  if (error.status === 429 || data.code === "ML_RATE_LIMITED") {
+    return "Prediction service is temporarily busy. Please try again in a moment.";
+  }
+  if (data.code === "ML_TIMEOUT") {
+    return "Prediction service timed out. Please try again.";
+  }
+  if ([502, 503, 504].includes(error.status)) {
+    return "Prediction service is temporarily unavailable. Please try again.";
+  }
+  return error.message || "Prediction failed. Please try again.";
 }
 
 function buildMlForecast(prediction: MLPredictionResponse): ForecastPoint[] {
