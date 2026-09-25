@@ -54,6 +54,9 @@ export function BuyerDashboard() {
   const matches = firstDemand ? scoreMatches(firstDemand, lots) : [];
   const myDeals = user ? deals.filter((deal) => deal.buyerId === user.id || deal.buyer === user.name) : deals;
   const activeDeals = myDeals.filter((deal) => deal.status !== "COMPLETED");
+  const reliabilityScore = myDeals.length
+    ? Math.round((myDeals.filter((deal) => deal.paymentReceived || deal.paymentStatus === "RECEIVED").length / myDeals.length) * 100)
+    : null;
 
   return (
     <div className="space-y-5">
@@ -63,7 +66,7 @@ export function BuyerDashboard() {
         <StatCard label={t("dashboard.myRequirements")} value={String(shownDemands.length)} helper={t("dashboard.openNeeds")} icon={ShoppingBasket} />
         <StatCard label={t("dashboard.matchingProduce")} value={String(matches.length)} helper={t("dashboard.forLatestRequirement")} icon={PackageSearch} />
         <StatCard label={t("dashboard.activeDeals")} value={String(activeDeals.length)} helper={t("dashboard.inProgress")} icon={HandCoins} />
-        <StatCard label={t("dashboard.reliabilityScore")} value={t("dashboard.verified")} helper={t("dashboard.buyerProfile")} icon={ShieldCheck} />
+        <StatCard label={t("dashboard.reliabilityScore")} value={reliabilityScore === null ? "N/A" : `${reliabilityScore}/100`} helper={t("dashboard.buyerProfile")} icon={ShieldCheck} />
       </div>
 
       <section className="rounded-md border border-[#D8CDBB] bg-[#E9E1D2] p-4">

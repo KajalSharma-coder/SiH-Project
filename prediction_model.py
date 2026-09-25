@@ -231,10 +231,16 @@ def predict_future_prices(
     market: str,
     prediction_days: int,
     fairtrade_history: pd.DataFrame | None = None,
+    prediction_date=None,
 ) -> dict[str, Any]:
     model = artifact["model"]
     model_features = artifact.get("features", MODEL_FEATURES)
     history = merge_prediction_history(artifact["history"], fairtrade_history if fairtrade_history is not None else pd.DataFrame())
+    if prediction_date is not None:
+        cutoff = pd.to_datetime(prediction_date, errors="coerce")
+        if pd.isna(cutoff):
+            raise ValueError("prediction_date must be a valid date.")
+        history = history[history["Arrival_Date"] <= cutoff]
     selected = select_history(history, crop, state, district, market).sort_values("Arrival_Date")
     if any(feature in model_features for feature in LAG_FEATURES) and len(selected) < 7:
         raise ValueError("Not enough historical data for this crop/market. Train the model with more records.")

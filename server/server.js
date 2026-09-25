@@ -968,6 +968,7 @@ function normalizePredictionPayload(source) {
     district: String(source.district || source.city || "").trim(),
     market: String(source.market || source.mandi || "").trim(),
     prediction_days: Number(source.prediction_days || source.predictionDays || 7),
+    prediction_date: source.prediction_date || source.predictionDate || null,
   };
 
   if (!payload.crop || !payload.state || !payload.district || !payload.market) {
@@ -978,6 +979,12 @@ function normalizePredictionPayload(source) {
 
   if (!Number.isFinite(payload.prediction_days) || payload.prediction_days < 1 || payload.prediction_days > 30) {
     const error = new Error("prediction_days must be between 1 and 30.");
+    error.status = 400;
+    throw error;
+  }
+
+  if (payload.prediction_date !== null && !/^\d{4}-\d{2}-\d{2}$/.test(String(payload.prediction_date))) {
+    const error = new Error("prediction_date must use YYYY-MM-DD format.");
     error.status = 400;
     throw error;
   }

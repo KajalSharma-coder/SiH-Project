@@ -41,6 +41,7 @@ export type MLPredictionRequest = {
   district: string;
   market: string;
   predictionDays: number;
+  predictionDate?: string;
 };
 
 export type MLPredictionPoint = {

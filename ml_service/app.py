@@ -1,5 +1,6 @@
 import os
 import sys
+from datetime import date
 import logging
 from time import perf_counter
 
@@ -24,6 +25,7 @@ class PredictionRequest(BaseModel):
     district: str = Field(..., min_length=1)
     market: str = Field(..., min_length=1)
     prediction_days: int = Field(7, ge=1, le=30)
+    prediction_date: date | None = None
 
 
 def get_artifact():
@@ -116,6 +118,7 @@ def predict(payload: PredictionRequest):
             district=payload.district,
             market=payload.market,
             prediction_days=payload.prediction_days,
+            prediction_date=payload.prediction_date,
             fairtrade_history=fairtrade_history,
         )
         if database_warning:

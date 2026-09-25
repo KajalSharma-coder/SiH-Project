@@ -48,7 +48,7 @@ export function ForecastChart({ data, height = 280 }: { data: ForecastPoint[]; h
         </ResponsiveContainer>
       ) : (
         <div className="flex h-full items-center justify-center rounded-md border border-dashed border-[#D8CDBB] text-sm text-[#765536]">
-          No trend data available.
+          Price trend data is currently unavailable.
         </div>
       )}
     </div>

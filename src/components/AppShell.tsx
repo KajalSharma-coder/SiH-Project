@@ -34,7 +34,7 @@ export function AppShell() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F4EFE4] text-[#33291F]">
+    <div className="min-h-screen bg-[#F4EFE4] text-[#33291F] lg:h-screen lg:overflow-hidden">
       <header className="sticky top-0 z-40 border-b border-[#D8CDBB] bg-[#F4EFE4]/95 backdrop-blur lg:hidden">
         <div className="flex items-center justify-between px-4 py-3">
           <FairTradeLogo size="sm" showSubtitle={false} />
@@ -50,7 +50,7 @@ export function AppShell() {
 
       <div className="flex min-h-screen">
         <aside
-          className={`fixed inset-y-0 left-0 z-50 w-64 border-r border-[#45472B] bg-[#555633] px-4 py-5 transition-transform lg:sticky lg:top-0 lg:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-50 w-64 overflow-hidden border-r border-[#45472B] bg-[#555633] px-4 py-5 transition-transform lg:translate-x-0 ${
             open ? "translate-x-0" : "-translate-x-full"
           }`}
         >
@@ -103,7 +103,7 @@ export function AppShell() {
 
         {open && <button className="fixed inset-0 z-40 bg-black/20 lg:hidden" onClick={() => setOpen(false)} aria-label="Close menu overlay" />}
 
-        <main className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-7">
+        <main className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:ml-64 lg:h-screen lg:overflow-y-auto lg:px-7">
           <Outlet />
         </main>
       </div>

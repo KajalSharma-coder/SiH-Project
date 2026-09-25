@@ -137,6 +137,7 @@ def predict_future_prices(
     market: str,
     prediction_days: int,
     fairtrade_history: pd.DataFrame | None = None,
+    prediction_date=None,
 ):
     return tanmay_model.predict_future_prices(
         artifact=artifact,
@@ -146,4 +147,5 @@ def predict_future_prices(
         market=market,
         prediction_days=prediction_days,
         fairtrade_history=fairtrade_history,
+        prediction_date=prediction_date,
     )
