@@ -72,23 +72,9 @@ export function AppShell() {
             </nav>
 
             <div className="mt-auto space-y-3">
-              <label className="block rounded-md border border-[#E9E1D2]/15 bg-white/10 p-3 text-[#F4EFE4]">
-                <span className="mb-2 flex items-center gap-2 text-xs font-bold text-[#E9E1D2]">
-                  <Globe2 size={15} />
-                  {t("language.label")}
-                </span>
-                <select
-                  value={language}
-                  onChange={(event) => setLanguage(event.target.value as Language)}
-                  className="w-full rounded-md border border-[#E9E1D2]/25 bg-[#4A4B2D] px-3 py-2 text-sm font-bold text-[#F4EFE4] outline-none focus:border-[#E1B083]"
-                >
-                  <option value="en">{t("language.english")}</option>
-                  <option value="hi">{t("language.hindi")}</option>
-                </select>
-              </label>
-              <div className="rounded-md border border-[#E9E1D2]/15 bg-white/10 p-3 text-[#F4EFE4]">
-                <p className="text-sm font-bold">{user?.name}</p>
-                <p className="text-xs text-[#E9E1D2]/80">{roleLabel(user?.role)}</p>
+              <div className="px-3 text-[#F4EFE4]">
+                <p className="text-xs font-bold">{user?.name}</p>
+                <p className="text-[11px] text-[#E9E1D2]/80">{roleLabel(user?.role)}</p>
               </div>
               <button
                 onClick={handleLogout}
@@ -97,6 +83,20 @@ export function AppShell() {
                 <LogOut size={17} />
                 {t("nav.logout")}
               </button>
+              <label className="block px-3 text-[#F4EFE4]">
+                <span className="mb-2 flex items-center gap-2 text-[11px] font-bold text-[#E9E1D2]">
+                  <Globe2 size={14} />
+                  {t("language.label")}
+                </span>
+                <select
+                  value={language}
+                  onChange={(event) => setLanguage(event.target.value as Language)}
+                  className="w-full rounded-md border border-[#E9E1D2]/25 bg-[#4A4B2D] px-3 py-2 text-xs font-bold text-[#F4EFE4] outline-none focus:border-[#E1B083]"
+                >
+                  <option value="en">{t("language.english")}</option>
+                  <option value="hi">{t("language.hindi")}</option>
+                </select>
+              </label>
             </div>
           </div>
         </aside>
