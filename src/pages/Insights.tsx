@@ -17,7 +17,6 @@ export function PricePrediction() {
   const [quotes, setQuotes] = useState<MarketQuote[]>([]);
   const [quote, setQuote] = useState<MarketQuote | null>(null);
   const [period, setPeriod] = useState("7 Days");
-  const [predictionDate, setPredictionDate] = useState(formatDateInput(new Date()));
   const [loading, setLoading] = useState(true);
   const [mlPrediction, setMlPrediction] = useState<MLPredictionResponse | null>(null);
   const [mlLoading, setMlLoading] = useState(false);
@@ -94,15 +93,7 @@ export function PricePrediction() {
     setMlError(null);
 
     try {
-      const prediction = await getMlPrediction({
-        ...form,
-        crop: quote?.crop ?? form.crop,
-        state: quote?.state ?? form.state,
-        district: quote?.city ?? form.district,
-        market: quote?.mandi ?? form.market,
-        predictionDays: periodDays,
-        predictionDate,
-      });
+      const prediction = await getMlPrediction(form);
       setMlPrediction(prediction);
     } catch (error) {
       setMlPrediction(null);
@@ -110,14 +101,6 @@ export function PricePrediction() {
     } finally {
       setMlLoading(false);
     }
-  }
-
-  function resetFilters() {
-    setQuote(quotes[0] ?? null);
-    setPeriod("7 Days");
-    setPredictionDate(formatDateInput(new Date()));
-    setMlPrediction(null);
-    setMlError(null);
   }
 
   if (loading || !quote) {
@@ -142,18 +125,8 @@ export function PricePrediction() {
       <PageHeader title={t("price.title")} subtitle={t("price.subtitle")} />
 
       <section className="rounded-md border border-[#D8CDBB] bg-white p-4 shadow-sm">
-        <div className="grid gap-3 lg:grid-cols-[1fr_180px_180px]">
+        <div className="grid gap-3 lg:grid-cols-[1fr_180px]">
           <MarketSelector quote={quote} quotes={quotes} onChange={setQuote} />
-          <label className="text-xs font-bold uppercase tracking-wide text-[#765536]">
-            Date
-            <input
-              type="date"
-              value={predictionDate}
-              max={formatDateInput(new Date())}
-              onChange={(event) => setPredictionDate(event.target.value)}
-              className={inputClass}
-            />
-          </label>
           <label className="text-xs font-bold uppercase tracking-wide text-[#765536]">
             {t("price.timePeriod")}
             <select value={period} onChange={(event) => setPeriod(event.target.value)} className={inputClass}>
@@ -162,14 +135,6 @@ export function PricePrediction() {
               <option>30 Days</option>
             </select>
           </label>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-3">
-          <button type="button" onClick={handlePredict} disabled={mlLoading || !form.crop || !form.state || !form.district || !form.market} className="rounded-md bg-[#555633] px-4 py-2.5 text-sm font-bold text-[#F4EFE4] transition hover:bg-[#464729] disabled:cursor-not-allowed disabled:opacity-60">
-            Apply Filters
-          </button>
-          <button type="button" onClick={resetFilters} className="rounded-md border border-[#555633] px-4 py-2.5 text-sm font-bold text-[#555633] transition hover:bg-[#F4EFE4]">
-            Reset
-          </button>
         </div>
       </section>
 
@@ -286,13 +251,6 @@ function PredictionSelect({ label, value, options, onChange }: { label: string; 
 
 function uniqueOptions(values: string[], fallback: string[] = []) {
   return Array.from(new Set([...values.filter(Boolean), ...fallback])).sort((a, b) => a.localeCompare(b));
-}
-
-function formatDateInput(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }
 
 function buildMlForecast(prediction: MLPredictionResponse): ForecastPoint[] {

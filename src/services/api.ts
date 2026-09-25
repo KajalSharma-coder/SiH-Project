@@ -137,7 +137,6 @@ export async function getMlPrediction(payload: MLPredictionRequest) {
       district: payload.district,
       market: payload.market,
       prediction_days: payload.predictionDays,
-      prediction_date: payload.predictionDate,
     },
   });
 
