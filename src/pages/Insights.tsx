@@ -111,6 +111,7 @@ export function PricePrediction() {
   const mlForecast = mlPrediction ? buildMlForecast(mlPrediction) : null;
   const fallbackForecast = normalizeForecastSeries(quote.forecast);
   const forecastData = mlForecast?.length ? mlForecast : fallbackForecast;
+  const chartData = mlForecast ?? [];
   const forecast = forecastData.filter((point) => isFiniteNumber(point.price));
   const predicted = mlPrediction?.predictions.at(-1)?.predictedPrice ?? forecast.at(-1)?.price ?? currentPrice;
   const change = predicted - currentPrice;
@@ -224,7 +225,7 @@ export function PricePrediction() {
           <h2 className="font-black">{t("price.simpleTrend")}</h2>
           <span className="rounded-full bg-[#E9E1D2] px-3 py-1 text-xs font-bold text-[#33291F]">{t("price.confidence", { value: confidence })}</span>
         </div>
-        <ForecastChart data={forecastData} height={320} />
+        <ForecastChart data={chartData} height={320} />
         <p className="mt-4 rounded-md bg-[#F4EFE4] p-3 text-sm text-[#765536]">
           {mlError ? `${t("price.note")} ML service unavailable: ${mlError}` : t("price.note")}
         </p>
@@ -272,10 +273,11 @@ function buildMlForecast(prediction: MLPredictionResponse): ForecastPoint[] {
   prediction.predictions.forEach((point, index) => {
     if (!isFiniteNumber(point.predictedPrice)) return;
 
-    const predictedDate = addDays(today, index + 1);
+    const predictedDate = new Date(point.date);
+    const dateForLabel = Number.isNaN(predictedDate.getTime()) ? addDays(today, index + 1) : predictedDate;
     const price = point.predictedPrice;
     points.push({
-      label: predictedDate.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
+      label: dateForLabel.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
       price,
       predicted: price,
       low: isFiniteNumber(point.low) ? point.low : price,
