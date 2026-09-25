@@ -78,7 +78,7 @@ export function AppShell() {
               </div>
               <button
                 onClick={handleLogout}
-                className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-semibold text-[#E9E1D2] hover:bg-white/10 hover:text-white"
+                className="flex w-full items-center gap-3 rounded-md bg-[#B96832] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[#A2572A]"
               >
                 <LogOut size={17} />
                 {t("nav.logout")}
@@ -91,10 +91,11 @@ export function AppShell() {
                 <select
                   value={language}
                   onChange={(event) => setLanguage(event.target.value as Language)}
-                  className="w-full rounded-md border border-[#E9E1D2]/25 bg-[#4A4B2D] px-3 py-2 text-xs font-bold text-[#F4EFE4] outline-none focus:border-[#E1B083]"
+                  aria-label="Select language"
+                  className="w-16 rounded-full border border-[#E9E1D2]/25 bg-[#4A4B2D] px-2 py-2 text-center text-xs font-bold text-[#F4EFE4] outline-none focus:border-[#E1B083]"
                 >
-                  <option value="en">{t("language.english")}</option>
-                  <option value="hi">{t("language.hindi")}</option>
+                  <option value="en">EN</option>
+                  <option value="hi">HI</option>
                 </select>
               </label>
             </div>
