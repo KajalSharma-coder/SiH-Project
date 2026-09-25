@@ -19,6 +19,13 @@ const ML_API_TIMEOUT_MS = Math.max(positiveNumberEnv("ML_API_TIMEOUT_MS", 30000)
 const ML_API_RETRIES = nonNegativeIntegerEnv("ML_API_RETRIES", 2);
 const ML_API_RETRY_BASE_DELAY_MS = positiveNumberEnv("ML_API_RETRY_BASE_DELAY_MS", 5000);
 const ML_API_RETRY_MAX_DELAY_MS = positiveNumberEnv("ML_API_RETRY_MAX_DELAY_MS", 10000);
+const ML_KEEP_ALIVE_INTERVAL_MS = 5 * 60 * 1000;
+const ML_KEEP_ALIVE_START_DELAY_MS = 5 * 1000;
+const ML_KEEP_ALIVE_TIMEOUT_MS = 15 * 1000;
+
+let mlKeepAliveTimer = null;
+let mlKeepAliveStartTimer = null;
+let mlKeepAliveInFlight = false;
 
 if (isProduction && !JWT_SECRET) {
   throw new Error("JWT_SECRET is required in production.");
@@ -52,6 +59,63 @@ function positiveNumberEnv(name, fallback) {
 function nonNegativeIntegerEnv(name, fallback) {
   const value = Number(process.env[name]);
   return Number.isFinite(value) && value >= 0 ? Math.floor(value) : fallback;
+}
+
+async function checkMlServiceHealth() {
+  if (!isProduction || !ML_SERVICE_URL || mlKeepAliveInFlight) return;
+
+  mlKeepAliveInFlight = true;
+  const healthUrl = `${ML_SERVICE_URL.replace(/\/+$/, "")}/health`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ML_KEEP_ALIVE_TIMEOUT_MS);
+
+  console.info("[ML KeepAlive] Checking ML service...");
+
+  try {
+    const response = await fetch(healthUrl, {
+      method: "GET",
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      console.warn(`[ML KeepAlive] ML service unavailable, will retry in 5 minutes (HTTP ${response.status})`);
+      return;
+    }
+
+    console.info("[ML KeepAlive] ML service is healthy");
+  } catch (error) {
+    const message = error?.name === "AbortError" ? "request timed out" : error?.message || "network error";
+    console.warn(`[ML KeepAlive] ML service unavailable, will retry in 5 minutes (${message})`);
+  } finally {
+    clearTimeout(timeout);
+    mlKeepAliveInFlight = false;
+  }
+}
+
+function startMlKeepAlive() {
+  if (!isProduction || !ML_SERVICE_URL || mlKeepAliveTimer || mlKeepAliveStartTimer) return;
+
+  mlKeepAliveStartTimer = setTimeout(() => {
+    mlKeepAliveStartTimer = null;
+    void checkMlServiceHealth();
+    mlKeepAliveTimer = setInterval(() => {
+      void checkMlServiceHealth();
+    }, ML_KEEP_ALIVE_INTERVAL_MS);
+    mlKeepAliveTimer.unref?.();
+  }, ML_KEEP_ALIVE_START_DELAY_MS);
+  mlKeepAliveStartTimer.unref?.();
+}
+
+function stopMlKeepAlive() {
+  if (mlKeepAliveStartTimer) {
+    clearTimeout(mlKeepAliveStartTimer);
+    mlKeepAliveStartTimer = null;
+  }
+
+  if (mlKeepAliveTimer) {
+    clearInterval(mlKeepAliveTimer);
+    mlKeepAliveTimer = null;
+  }
 }
 
 const corsOptions = {
@@ -1006,8 +1070,18 @@ app.get("/api/ml/predict", async (req, res) => {
 
 const server = app.listen(PORT, HOST, () => {
   console.log(`FairTrade Backend API server running on ${HOST}:${PORT}`);
+  startMlKeepAlive();
   initializeDatabase();
 });
+
+function handleShutdown(signal) {
+  console.info(`[ML KeepAlive] Stopping keep-alive timer on ${signal}`);
+  stopMlKeepAlive();
+  server.close(() => process.exit(0));
+}
+
+process.once("SIGTERM", () => handleShutdown("SIGTERM"));
+process.once("SIGINT", () => handleShutdown("SIGINT"));
 
 server.on("error", (error) => {
   if (error.code === "EADDRINUSE") {
