@@ -25,7 +25,7 @@ export function Login({ initialMode = "login" }: { initialMode?: "login" | "sign
 
   useEffect(() => {
     if (!loading && currentUser) {
-      navigate(currentUser.role === "Farmer" ? "/farmer/dashboard" : "/buyer/dashboard", { replace: true });
+      navigate(currentUser.role === "Farmer" ? "/farmer/dashboard" : currentUser.role === "Warehouse" ? "/quality-check" : "/buyer/dashboard", { replace: true });
     }
   }, [currentUser, loading, navigate]);
 
@@ -45,10 +45,10 @@ export function Login({ initialMode = "login" }: { initialMode?: "login" | "sign
         if (!name) throw new Error(t("auth.enterName"));
         if (password !== confirmPassword) throw new Error(t("auth.passwordMismatch"));
         const user = await signup(role, name, identifier, password);
-        navigate(fromPath || (user.role === "Farmer" ? "/farmer/dashboard" : "/buyer/dashboard"));
+        navigate(fromPath || (user.role === "Farmer" ? "/farmer/dashboard" : user.role === "Warehouse" ? "/quality-check" : "/buyer/dashboard"));
       } else {
         const user = await login(identifier, password);
-        navigate(fromPath || (user.role === "Farmer" ? "/farmer/dashboard" : "/buyer/dashboard"));
+        navigate(fromPath || (user.role === "Farmer" ? "/farmer/dashboard" : user.role === "Warehouse" ? "/quality-check" : "/buyer/dashboard"));
       }
     } catch (err: any) {
       setError(err.message || t("auth.failed"));

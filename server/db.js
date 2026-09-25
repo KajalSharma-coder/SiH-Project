@@ -142,6 +142,27 @@ export async function initDb() {
     )
   `);
 
+  await run(`CREATE SEQUENCE IF NOT EXISTS quality_sample_number_seq START WITH 1001`);
+  await run(`
+    CREATE TABLE IF NOT EXISTS crop_samples (
+      id BIGSERIAL PRIMARY KEY,
+      sample_id TEXT UNIQUE NOT NULL,
+      farmer_id TEXT NOT NULL,
+      crop TEXT NOT NULL,
+      state TEXT NOT NULL,
+      district TEXT NOT NULL,
+      location TEXT NOT NULL,
+      quantity REAL,
+      status TEXT NOT NULL DEFAULT 'REGISTERED',
+      quality_result TEXT,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      CHECK (status IN ('REGISTERED', 'OUT_FOR_TESTING', 'TESTING', 'TESTED')),
+      CHECK (quality_result IS NULL OR quality_result IN ('Alpha', 'Beta', 'Gamma'))
+    )
+  `);
+  await run(`CREATE INDEX IF NOT EXISTS crop_samples_farmer_id_idx ON crop_samples (farmer_id)`);
+
   await run(`
     CREATE TABLE IF NOT EXISTS lots (
       id TEXT PRIMARY KEY,

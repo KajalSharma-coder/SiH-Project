@@ -63,6 +63,24 @@ export type MLPredictionResponse = {
   databaseWarning?: string | null;
 };
 
+export type QualitySampleStatus = "REGISTERED" | "OUT_FOR_TESTING" | "TESTING" | "TESTED";
+export type QualityResult = "Alpha" | "Beta" | "Gamma";
+
+export type QualitySample = {
+  id: string;
+  sampleId: string;
+  farmerId: string;
+  crop: string;
+  state: string;
+  district: string;
+  location: string;
+  quantity: number | null;
+  status: QualitySampleStatus;
+  qualityResult: QualityResult | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type Lot = {
   id: string;
   farmerId: string;

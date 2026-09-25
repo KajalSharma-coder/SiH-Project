@@ -1,4 +1,4 @@
-import { BarChart3, FileText, Globe2, LayoutDashboard, LogOut, Menu, PackageCheck, Store, X } from "lucide-react";
+import { BarChart3, ClipboardCheck, FileText, Globe2, LayoutDashboard, LogOut, Menu, PackageCheck, Store, X } from "lucide-react";
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -20,8 +20,12 @@ export function AppShell() {
   const { language, setLanguage, t, roleLabel } = useI18n();
   const navigate = useNavigate();
 
-  const dashboardHref = user?.role === "Buyer" ? "/buyer/dashboard" : "/farmer/dashboard";
-  const navItems: NavItem[] = [["nav.dashboard", dashboardHref, LayoutDashboard], ...sharedItems];
+  const dashboardHref = user?.role === "Buyer" ? "/buyer/dashboard" : user?.role === "Warehouse" ? "/quality-check" : "/farmer/dashboard";
+  const navItems: NavItem[] = [
+    ["nav.dashboard", dashboardHref, LayoutDashboard],
+    ...sharedItems,
+    ...(user?.role === "Farmer" || user?.role === "Warehouse" ? [["nav.qualityCheck", "/quality-check", ClipboardCheck] as NavItem] : []),
+  ];
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-semibold transition ${

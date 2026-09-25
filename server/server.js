@@ -166,7 +166,7 @@ function authenticateToken(req, res, next) {
 app.post("/api/auth/register", async (req, res) => {
   try {
     const { role, name, identifier, password } = req.body;
-    if (!role || !name || !identifier || !password) {
+    if (!role || !name || !identifier || !password || !["Farmer", "Buyer"].includes(role)) {
       return res.status(400).json({ error: "Role, Name, Email/Mobile and Password are required." });
     }
 
@@ -326,6 +326,15 @@ app.post("/api/lots", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Failed to create produce lot" });
   }
 });
+
+function requireRole(...roles) {
+  return (req, res, next) => {
+    if (!roles.includes(req.user?.role)) {
+      return res.status(403).json({ error: "You are not authorized to perform this action." });
+    }
+    next();
+  };
+}
 
 app.delete("/api/lots/:id", authenticateToken, async (req, res) => {
   try {
@@ -849,6 +858,146 @@ app.get("/api/deals/:id/chat", authenticateToken, async (req, res) => {
 app.post("/api/deals/:id/chat", authenticateToken, async (req, res) => {
   req.url = `/api/deals/${req.params.id}/messages`;
   res.status(410).json({ error: "Use /api/deals/:id/messages for deal chat" });
+});
+
+const QUALITY_STATUSES = new Set(["REGISTERED", "OUT_FOR_TESTING", "TESTING", "TESTED"]);
+const QUALITY_RESULTS = new Set(["Alpha", "Beta", "Gamma"]);
+
+function formatCropSample(row) {
+  return {
+    id: String(row.id),
+    sampleId: row.sample_id,
+    farmerId: row.farmer_id,
+    crop: row.crop,
+    state: row.state,
+    district: row.district,
+    location: row.location,
+    quantity: row.quantity === null || row.quantity === undefined ? null : Number(row.quantity),
+    status: row.status,
+    qualityResult: row.quality_result,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function normalizeSampleId(value) {
+  const sampleId = String(value || "").trim().toUpperCase();
+  if (!/^QC-[A-Z0-9-]+$/.test(sampleId)) {
+    const error = new Error("A valid Sample ID is required.");
+    error.status = 400;
+    throw error;
+  }
+  return sampleId;
+}
+
+function normalizeCropSampleInput(source) {
+  const input = {
+    crop: String(source.crop || "").trim(),
+    state: String(source.state || "").trim(),
+    district: String(source.district || "").trim(),
+    location: String(source.location || "").trim(),
+    quantity: source.quantity === undefined || source.quantity === null || source.quantity === "" ? null : Number(source.quantity),
+  };
+
+  if (!input.crop || !input.state || !input.district || !input.location) {
+    const error = new Error("Crop, state, district and location are required.");
+    error.status = 400;
+    throw error;
+  }
+  if (input.quantity !== null && (!Number.isFinite(input.quantity) || input.quantity <= 0)) {
+    const error = new Error("Sample quantity must be greater than 0.");
+    error.status = 400;
+    throw error;
+  }
+  return input;
+}
+
+app.post("/api/quality-check/samples", authenticateToken, requireRole("Farmer"), async (req, res) => {
+  try {
+    const input = normalizeCropSampleInput(req.body || {});
+    const row = await get(
+      `INSERT INTO crop_samples (sample_id, farmer_id, crop, state, district, location, quantity)
+       VALUES ('QC-' || TO_CHAR(CURRENT_DATE, 'YYYY') || '-' || LPAD(NEXTVAL('quality_sample_number_seq')::TEXT, 4, '0'), $1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [req.user.id, input.crop, input.state, input.district, input.location, input.quantity]
+    );
+    res.status(201).json(formatCropSample(row));
+  } catch (err) {
+    console.error("Create quality sample error:", err);
+    res.status(err.status || 500).json({ error: err.message || "Failed to register crop sample." });
+  }
+});
+
+app.get("/api/quality-check/samples", authenticateToken, requireRole("Farmer", "Warehouse"), async (req, res) => {
+  try {
+    const rows = req.user.role === "Farmer"
+      ? await all("SELECT * FROM crop_samples WHERE farmer_id = $1 ORDER BY created_at DESC", [req.user.id])
+      : await all("SELECT * FROM crop_samples ORDER BY created_at DESC");
+    res.json(rows.map(formatCropSample));
+  } catch (err) {
+    res.status(500).json({ error: "Failed to load crop samples." });
+  }
+});
+
+app.get("/api/quality-check/samples/:sampleId", authenticateToken, requireRole("Farmer", "Warehouse"), async (req, res) => {
+  try {
+    const sampleId = normalizeSampleId(req.params.sampleId);
+    const row = await get("SELECT * FROM crop_samples WHERE sample_id = $1", [sampleId]);
+    if (!row || req.user.role === "Farmer" && row.farmer_id !== req.user.id) {
+      return res.status(404).json({ error: "Sample ID not found." });
+    }
+    res.json(formatCropSample(row));
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message || "Failed to find crop sample." });
+  }
+});
+
+app.patch("/api/quality-check/samples/:sampleId/status", authenticateToken, requireRole("Farmer", "Warehouse"), async (req, res) => {
+  try {
+    const sampleId = normalizeSampleId(req.params.sampleId);
+    const nextStatus = String(req.body.status || "").trim().toUpperCase();
+    if (!QUALITY_STATUSES.has(nextStatus)) return res.status(400).json({ error: "Invalid sample status." });
+
+    const sample = await get("SELECT * FROM crop_samples WHERE sample_id = $1", [sampleId]);
+    if (!sample || req.user.role === "Farmer" && sample.farmer_id !== req.user.id) {
+      return res.status(404).json({ error: "Sample ID not found." });
+    }
+
+    const farmerTransition = req.user.role === "Farmer" && sample.status === "REGISTERED" && nextStatus === "OUT_FOR_TESTING";
+    const warehouseTransition = req.user.role === "Warehouse" && sample.status === "OUT_FOR_TESTING" && nextStatus === "TESTING";
+    if (!farmerTransition && !warehouseTransition) {
+      return res.status(409).json({ error: `Cannot change sample status from ${sample.status} to ${nextStatus}.` });
+    }
+
+    const updated = await get(
+      "UPDATE crop_samples SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE sample_id = $2 AND status = $3 RETURNING *",
+      [nextStatus, sampleId, sample.status]
+    );
+    if (!updated) return res.status(409).json({ error: "Sample status was already changed. Refresh and try again." });
+    res.json(formatCropSample(updated));
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message || "Failed to update sample status." });
+  }
+});
+
+app.patch("/api/quality-check/samples/:sampleId/result", authenticateToken, requireRole("Warehouse"), async (req, res) => {
+  try {
+    const sampleId = normalizeSampleId(req.params.sampleId);
+    const qualityResult = String(req.body.qualityResult || "").trim();
+    if (!QUALITY_RESULTS.has(qualityResult)) return res.status(400).json({ error: "Quality result must be Alpha, Beta or Gamma." });
+
+    const updated = await get(
+      `UPDATE crop_samples
+       SET quality_result = $1, status = 'TESTED', updated_at = CURRENT_TIMESTAMP
+       WHERE sample_id = $2 AND status IN ('OUT_FOR_TESTING', 'TESTING')
+       RETURNING *`,
+      [qualityResult, sampleId]
+    );
+    if (!updated) return res.status(409).json({ error: "Only samples awaiting testing can receive a quality result." });
+    res.json(formatCropSample(updated));
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message || "Failed to update quality result." });
+  }
 });
 
 // Sample / Quality registration

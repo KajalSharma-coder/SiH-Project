@@ -5,7 +5,7 @@ import { useI18n } from "./I18nContext";
 
 export type AuthUser = {
   id: string;
-  role: "Farmer" | "Buyer";
+  role: "Farmer" | "Buyer" | "Warehouse";
   name: string;
   identifier: string;
 };
@@ -81,7 +81,7 @@ export function useAuth() {
   return context;
 }
 
-export function ProtectedRoute({ children, roleRequired }: { children: React.ReactNode; roleRequired?: "Farmer" | "Buyer" }) {
+export function ProtectedRoute({ children, roleRequired }: { children: React.ReactNode; roleRequired?: AuthUser["role"] | AuthUser["role"][] }) {
   const { user, loading } = useAuth();
   const { t } = useI18n();
   const location = useLocation();
@@ -101,8 +101,9 @@ export function ProtectedRoute({ children, roleRequired }: { children: React.Rea
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (roleRequired && user.role !== roleRequired) {
-    const redirectPath = user.role === "Farmer" ? "/farmer/dashboard" : "/buyer/dashboard";
+  const allowedRoles = roleRequired ? (Array.isArray(roleRequired) ? roleRequired : [roleRequired]) : null;
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    const redirectPath = user.role === "Farmer" ? "/farmer/dashboard" : user.role === "Warehouse" ? "/quality-check" : "/buyer/dashboard";
     return <Navigate to={redirectPath} replace />;
   }
 

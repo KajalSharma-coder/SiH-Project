@@ -13,6 +13,7 @@ import { DailyPriceTracking, PricePrediction, PricePulse, Reliability } from "./
 import { Marketplace } from "./pages/Market";
 import { Admin, Login, Settings } from "./pages/Misc";
 import { Bill, DealRoom, Transactions } from "./pages/Transactions";
+import { QualityCheck } from "./pages/QualityCheck";
 
 const router = createBrowserRouter([
   {
@@ -36,6 +37,14 @@ const router = createBrowserRouter([
       { path: "market", element: <Navigate to="/marketplace" replace /> },
       { path: "price-prediction", element: <PricePrediction /> },
       { path: "daily-prices", element: <DailyPriceTracking /> },
+      {
+        path: "quality-check",
+        element: (
+          <ProtectedRoute roleRequired={["Farmer", "Warehouse"]}>
+            <QualityCheck />
+          </ProtectedRoute>
+        ),
+      },
       {
         path: "farmer/dashboard",
         element: (

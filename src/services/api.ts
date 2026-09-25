@@ -1,4 +1,4 @@
-import type { ChatMessage, Deal, DealOffer, Demand, Lot, Market, MarketQuote, MatchScore, MLPredictionRequest, MLPredictionResponse } from "../types";
+import type { ChatMessage, Deal, DealOffer, Demand, Lot, Market, MarketQuote, MatchScore, MLPredictionRequest, MLPredictionResponse, QualityResult, QualitySample, QualitySampleStatus } from "../types";
 
 const DEV_API_BASE_URL = "http://localhost:5000/api";
 
@@ -91,22 +91,22 @@ export const api = {
 };
 
 // ---------- Auth APIs ----------
-export async function registerUser(payload: { role: string; name: string; identifier: string; password: string }) {
-  return request<{ token: string; user: { id: string; role: "Farmer" | "Buyer"; name: string; identifier: string } }>(
+export async function registerUser(payload: { role: "Farmer" | "Buyer"; name: string; identifier: string; password: string }) {
+  return request<{ token: string; user: { id: string; role: "Farmer" | "Buyer" | "Warehouse"; name: string; identifier: string } }>(
     "/auth/register",
     { method: "POST", body: payload }
   );
 }
 
 export async function loginUser(payload: { identifier: string; password: string }) {
-  return request<{ token: string; user: { id: string; role: "Farmer" | "Buyer"; name: string; identifier: string } }>(
+  return request<{ token: string; user: { id: string; role: "Farmer" | "Buyer" | "Warehouse"; name: string; identifier: string } }>(
     "/auth/login",
     { method: "POST", body: payload }
   );
 }
 
 export async function getCurrentUser() {
-  return request<{ user: { id: string; role: "Farmer" | "Buyer"; name: string; identifier: string } }>("/auth/me");
+  return request<{ user: { id: string; role: "Farmer" | "Buyer" | "Warehouse"; name: string; identifier: string } }>("/auth/me");
 }
 
 // ---------- Market Quotes API ----------
@@ -116,6 +116,32 @@ export async function getMarketQuotes() {
 
 export async function getMarkets() {
   return request<Market[]>("/markets");
+}
+
+export async function getQualitySamples() {
+  return request<QualitySample[]>("/quality-check/samples");
+}
+
+export async function createQualitySample(payload: { crop: string; state: string; district: string; location: string; quantity?: number }) {
+  return request<QualitySample>("/quality-check/samples", { method: "POST", body: payload });
+}
+
+export async function getQualitySample(sampleId: string) {
+  return request<QualitySample>(`/quality-check/samples/${encodeURIComponent(sampleId)}`);
+}
+
+export async function updateQualitySampleStatus(sampleId: string, status: QualitySampleStatus) {
+  return request<QualitySample>(`/quality-check/samples/${encodeURIComponent(sampleId)}/status`, {
+    method: "PATCH",
+    body: { status },
+  });
+}
+
+export async function updateQualityResult(sampleId: string, qualityResult: QualityResult) {
+  return request<QualitySample>(`/quality-check/samples/${encodeURIComponent(sampleId)}/result`, {
+    method: "PATCH",
+    body: { qualityResult },
+  });
 }
 
 export async function getMlPrediction(payload: MLPredictionRequest) {
